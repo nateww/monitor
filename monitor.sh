@@ -27,19 +27,6 @@
 #VERSION NUMBER
 export version=0.2.200
 
-if [ -z ${NO_COLOR} -o -z ${NOCOLOR} ]; then
-    #COLOR OUTPUT FOR RICH OUTPUT
-    ORANGE=$'\e[1;33m'
-    RED=$'\e[1;31m'
-    NC=$'\e[0m'
-    GREEN=$'\e[1;32m'
-    PURPLE=$'\e[1;35m'
-    BLUE=$'\e[1;34m'
-    CYAN=$'\e[1;36m'
-    YELLOW=$'\e[01;33m'
-    REPEAT=$'\e[1A'
-fi
-
 # CAPTURE ARGS IN VAR TO USE IN SOURCED FILE
 export RUNTIME_ARGS=("$@")
 
@@ -100,7 +87,6 @@ mkfifo log_pipe
 rm packet_pipe &>/dev/null
 mkfifo packet_pipe
 
-
 # DEFINE DEVICE TRACKING VARS
 declare -A public_device_log
 declare -A random_device_log
@@ -133,14 +119,14 @@ first_arrive_scan=true
 # ------------------------------------------------------------------------------
 
 # LOAD PUBLIC ADDRESSES TO SCAN INTO ARRAY, IGNORING COMMENTS
-mapfile -t known_static_beacons < <(sed 's/#.\{0,\}//gi' < "$BEAC_CONFIG" | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" )
-mapfile -t known_static_addresses < <(sed 's/#.\{0,\}//gi' < "$PUB_CONFIG" | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" )
-mapfile -t address_blacklist < <(sed 's/#.\{0,\}//gi' < "$ADDRESS_BLACKLIST" | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" )
+mapfile -t known_static_beacons < < (grep -v '^#' $BEAC_CONFIG | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | aws '{print $1}' | sed 's/[ \t]+$//')
+mapfile -t known_static_addresses < <(grep -v '^#' $PUB_CONFIG | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | sed 's/[ \t]+$//')
+mapfile -t address_blacklist < <(grep -v '^#' $ADDRESS_BLACKLIST | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | sed 's/[ \t]+$//')
 
 # ASSEMBLE COMMENT-CLEANED BLACKLIST INTO BLACKLIST ARRAY
 for addr in "${address_blacklist[@]^^}"; do
     blacklisted_devices[$addr]=1
-    printf "%s\n" "> ${RED}blacklisted device:${NC} $addr"
+    echo "> blacklisted device: $addr"
 done
 
 # ------------------------------------------------------------------------------
@@ -155,7 +141,7 @@ for addr in "${known_static_addresses[@]^^}"; do
     #================= SHOULD WE USE AN ALIAS? =====================
 
     # WAS THERE A NAME HERE?
-    known_name=$(grep -i "$addr" "$PUB_CONFIG" | tr "\\t" " " | sed 's/  */ /gi;s/#.\{0,\}//gi' | sed "s/$addr //gi;s/  */ /gi" )
+    known_name=$(grep -i "$addr" $PUB_CONFIG | sed "s/^.*$addr//i" | tr "\\t" " " | sed 's/  */ /gi;s/#.\{0,\}//gi' | sed "s/[ \t]+$//" )
 
     # IF THE VALUE DOES NOT EXIST, USE THE KEY (MAC ADDRESS INSTEAD)
     alias_value=${known_name//[^A-Za-z0-9]/_}
@@ -163,7 +149,7 @@ for addr in "${known_static_addresses[@]^^}"; do
     # LOWERCASE
     alias_value=${alias_value,,}
 
-    # REMOVE FINAL UNDERSCORES SHOUDL THERE BE
+    # REMOVE FINAL UNDERSCORES SHOULD THERE BE ONE
     alias_value=$(echo "$alias_value" | sed 's/[^0-9a-z]\{1,\}$//gi;s/^[^0-9a-z]\{1,\}//gi;s/__*/_/gi')
 
     # DEFAULT
@@ -189,8 +175,8 @@ for addr in "${known_static_addresses[@]^^}"; do
     $PREF_MQTT_SINGLE_TOPIC_MODE && pub_topic="$mqtt_topicpath/$mqtt_publisher_identity { id: $addr ... }"
 
     # FOR DEBUGGING
-    printf "%s\n" "> ${GREEN}$addr${NC} confidence topic: $pub_topic (has $is_connected to $PREF_HCI_DEVICE)"
-    [ "$PREF_DEVICE_TRACKER_REPORT" == 'true' ] && printf "%s\n" "> ${GREEN}$addr${NC} device_tracker topic: $pub_topic/$PREF_DEVICE_TRACKER_TOPIC_BRANCH [$PREF_DEVICE_TRACKER_AWAY_STRING or $PREF_DEVICE_TRACKER_HOME_STRING]"
+    echo "> $addr confidence topic: $pub_topic (has $is_connected to $PREF_HCI_DEVICE)"
+    [ "$PREF_DEVICE_TRACKER_REPORT" == 'true' ] && echo "> $addr device_tracker topic: $pub_topic/$PREF_DEVICE_TRACKER_TOPIC_BRANCH [$PREF_DEVICE_TRACKER_AWAY_STRING or $PREF_DEVICE_TRACKER_HOME_STRING]"
 done
 
 # ------------------------------------------------------------------------------
@@ -198,10 +184,10 @@ done
 # ------------------------------------------------------------------------------
 # POPULATE KNOWN DEVICE ADDRESS
 for addr in "${known_static_beacons[@]^^}"; do
-    # WAS THERE A NAME HERE?
-    known_name=$(grep "$addr" "$BEAC_CONFIG" | tr "\\t" " " | sed 's/  */ /gi;s/#.\{0,\}//gi' | sed "s/$addr //gi;s/  */ /gi" )
-
     #================= SHOULD WE USE AN ALIAS? =====================
+
+    # WAS THERE A NAME HERE?
+    known_name=$(grep -i "$addr" $PUB_CONFIG | sed "s/^.*$addr//i" | tr "\\t" " " | sed 's/  */ /gi;s/#.\{0,\}//gi' | sed "s/[ \t]+$//" )
 
     # IF THE VALUE DOES NOT EXIST, USE THE KEY (MAC ADDRESS INSTEAD)
     alias_value=${known_name//[^A-Za-z0-9]/_}
@@ -250,7 +236,6 @@ connectable_present_devices() {
 
         # TEST IF THIS DEVICE MATCHES THE TARGET SCAN STATE
         if [ "$this_state" == "1" ] && [[ "$previously_connected_devices" =~ .*$known_addr.* ]]; then
-
             # CREATE CONNECTION AND DETERMINE RSSI
             # AVERAGE OVER THREE CYCLES; IF BLANK GIVE VALUE OF 100
             known_device_rssi=$(counter=0; \
@@ -274,7 +259,7 @@ connectable_present_devices() {
               "-$known_device_rssi"
 
             # REPORT
-            $PREF_VERBOSE_LOGGING && log "${CYAN}[CMD-RSSI]    ${NC}$known_addr ${GREEN}$cmd ${NC}RSSI: -$known_device_rssi dBm ${NC}"
+            $PREF_VERBOSE_LOGGING && log "[CMD-RSSI]    $known_addr $cmd RSSI: -$known_device_rssi dBm "
 
             # SET RSSI LOG
             rssi_log[$known_addr]="$known_device_rssi"
@@ -297,21 +282,20 @@ scannable_devices_with_state() {
     # SET VALUES AFTER DECLARATION
     timestamp=$(date +%s)
     scan_state="$1"
+    # SCAN ALL? SET THE DEFAULT SCAN STATE TO [X]
+    scan_state=${scan_state:-2}
 
     # FIRST, TEST IF WE HAVE DONE THIS TYPE OF SCAN TOO RECENTLY
-    if [ "$scan_state" == "1" ]; then
-        # SCAN FOR DEPARTED DEVICES
-        scan_type_diff=$((timestamp - last_depart_scan))
-    elif [ "$scan_state" == "0" ]; then
+    if [ "$scan_state" == "0" ]; then
         # SCAN FOR ARRIVED DEVICES
         scan_type_diff=$((timestamp - last_arrival_scan))
+    elif [ "$scan_state" == "1" ]; then
+        # SCAN FOR DEPARTED DEVICES
+        scan_type_diff=$((timestamp - last_depart_scan))
     fi
 
     # REJECT IF WE SCANNED TO RECENTLY
     [ "$scan_type_diff" -lt "$PREF_MINIMUM_TIME_BETWEEN_SCANS" ] && return 0
-
-    # SCAN ALL? SET THE DEFAULT SCAN STATE TO [X]
-    scan_state=${scan_state:-2}
 
     # ITERATE THROUGH THE KNOWN DEVICES
     local known_addr
@@ -335,7 +319,6 @@ scannable_devices_with_state() {
             if [ "$this_state" == "$scan_state" ]; then
                 # ASSEMBLE LIST OF DEVICES TO SCAN
                 return_list="$return_list $this_state$known_addr"
-
             elif [ "$this_state" == "2" ] || [ "$this_state" == "3" ]; then
                 # SCAN FOR ALL DEVICES THAT HAVEN'T BEEN RECENTLY SCANNED;
                 # PRESUME DEVICE IS ABSENT
@@ -346,8 +329,6 @@ scannable_devices_with_state() {
 
     # RETURN LIST, CLEANING FOR EXCESS SPACES OR STARTING WITH SPACES
     return_list=$(echo "$return_list" | sed 's/^ //gi;s/ $//gi;s/  */ /gi')
-
-    #RETURN THE LIST
     echo "$return_list"
 }
 
@@ -357,7 +338,7 @@ scannable_devices_with_state() {
 perform_complete_scan() {
     # IF WE DO NOT RECEIVE A SCAN LIST, THEN RETURN 0
     if [ -z "$1" ]; then
-        #log "${GREEN}[CMD-INFO]    ${GREEN}**** Rejected group scan. No devices in desired state. **** ${NC}"
+        #log "CMD-INFO]    **** Rejected group scan. No devices in desired state. **** "
         return 0
     fi
 
@@ -385,13 +366,13 @@ perform_complete_scan() {
 
     # LOG START OF DEVICE SCAN
     $PREF_MQTT_REPORT_SCAN_MESSAGES && publish_cooperative_scan_message "$transition_type/start"
-    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INFO]    ${GREEN}**** started $transition_type scan [x$repetitions max rep] **** ${NC}"
+    $PREF_VERBOSE_LOGGING && log "[CMD-INFO]    **** started $transition_type scan [x$repetitions max rep] **** "
 
     # ITERATE THROUGH THE KNOWN DEVICES
     local repetition
     for repetition in $(seq 1 $repetitions); do
         # SET DONE TO MAIN PIPE
-        printf "%s\n" "DONE" > main_pipe
+        echo "DONE" > main_pipe
 
         # SET DEVICES
         devices="$devices_next"
@@ -436,7 +417,7 @@ perform_complete_scan() {
             expected_name=${expected_name:-Unknown}
 
             # DEBUG LOGGING
-            $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-SCAN]    ${GREEN}(No. $repetition)${NC} $known_addr $transition_type? ${NC}"
+            $PREF_VERBOSE_LOGGING && log "[CMD-SCAN]    (No. $repetition) $known_addr $transition_type? "
 
             # PERFORM NAME SCAN FROM HCI TOOL. THE HCITOOL CMD 0X1 0X0019 IS POSSIBLE, BUT HCITOOL NAME
             # SCAN PERFORMS VERIFICATIONS THAT REDUCE FALSE NEGATIVES.
@@ -450,13 +431,13 @@ perform_complete_scan() {
             scan_duration=$((scan_end - scan_start))
 
             # MARK THE ADDRESS AS SCANNED SO THAT IT CAN BE LOGGED ON THE MAIN PIPE
-            printf "%s\n" "SCAN$known_addr" > main_pipe &
+            echo "SCAN$known_addr" > main_pipe
 
             # IF STATUS CHANGES TO PRESENT FROM NOT PRESENT, REMOVE FROM VERIFICATIONS
             if [ -n "$name" ] && [ "$previous_state" == "0" ]; then
 
                 # PUSH TO MAIN POPE
-                printf "%s\n" "NAME$known_addr|$name" > main_pipe
+                echo "NAME$known_addr|$name" > main_pipe
 
                 # DEVICE FOUND; IS IT CHANGED? IF SO, REPORT
                 publish_presence_message \
@@ -474,7 +455,7 @@ perform_complete_scan() {
                 devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/  */ /gi")
 
                 # NEED TO UPDATE STATE TO MAIN THREAD
-                printf "%s\n" "NAME$known_addr|$name" > main_pipe
+                echo "NAME$known_addr|$name" > main_pipe
 
                 # NEVER SEEN THIS DEVICE; NEED TO PUBLISH STATE MESSAGE
                 publish_presence_message \
@@ -549,7 +530,7 @@ perform_complete_scan() {
                 devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/  */ /gi")
 
                 # PUBLISH A NOT PRESENT TO THE NAME PIPE
-                printf "%s\n" "NAME$known_addr|" > main_pipe
+                echo "NAME$known_addr|" > main_pipe
 
                 # COOPERATIVE SCAN ON RESTART
                 $PREF_TRIGGER_MODE_REPORT_OUT && publish_cooperative_scan_message "depart"
@@ -630,14 +611,14 @@ perform_complete_scan() {
               "-99"
         fi
 
-        printf "%s\n" "NAME$known_addr|" > main_pipe
+        echo "NAME$known_addr|" > main_pipe
     done
 
     # SET DONE TO MAIN PIPE
-    printf "%s\n" "DONE" > main_pipe
+    echo "DONE" > main_pipe
 
     # GROUP SCAN FINISHED
-    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INFO]    ${GREEN}**** completed $transition_type scan **** ${NC}"
+    $PREF_VERBOSE_LOGGING && log "[CMD-INFO]    **** completed $transition_type scan **** "
 
     # PUBLISH END OF COOPERATIVE SCAN
     $PREF_MQTT_REPORT_SCAN_MESSAGES && publish_cooperative_scan_message "$transition_type/end"
@@ -661,7 +642,7 @@ perform_departure_scan() {
     # ONLY ASSEMBLE IF WE NEED TO SCAN FOR ARRIVAL
     if [ "$scan_active" == false ]; then
         # ADD A FLAG TO SCAN FOR
-        [ -n "$depart_list" ] && printf "%s\n" "BEXP" > main_pipe &
+        [ -n "$depart_list" ] && echo "BEXP" > main_pipe
 
         # ONCE THE LIST IS ESTABLISHED, TRIGGER SCAN OF THESE DEVICES IN THE BACKGROUND
         perform_complete_scan "$depart_list" "$PREF_DEPART_SCAN_ATTEMPTS" "1" &
@@ -671,7 +652,7 @@ perform_departure_scan() {
         scan_type=1
     else
         # HERE A DEPART SCAN IS ACTIVE; ENQUEUE ANOTHER DEPART SCAN AFTER DELAY
-        [ "$scan_type" == "0" ] && sleep 5 && printf "%s\n" "ENQUdepart" > main_pipe &
+        [ "$scan_type" == "0" ] && sleep 5 && echo "ENQUdepart" > main_pipe
     fi
 }
 
@@ -700,7 +681,7 @@ perform_arrival_scan() {
         scan_type=0
     else
         # HERE A DEPART SCAN IS ACTIVE; ENQUEUE ANOTHER DEPART SCAN AFTER DELAY
-        [ "$scan_type" == "1" ] && sleep 5 && printf "%s\n" "ENQUarrive" > main_pipe &
+        [ "$scan_type" == "1" ] && sleep 5 && echo "ENQUarrive" > main_pipe
     fi
 }
 
@@ -760,7 +741,7 @@ determine_name() {
         fi
     fi
 
-    printf "%s\n" "$expected_name"
+    echo "$expected_name"
 }
 
 # ------------------------------------------------------------------------------
@@ -865,7 +846,7 @@ while true; do
             # WE HAVE AN ENQUEUED OPPOSITE SCAN; NEED TO TRIGGER THAT SCAN
             if [ "$data" == "arrive" ]; then
                 # LOG
-                $PREF_VERBOSE_LOGGING && log "${GREEN}[ENQ-ARR]    ${NC}Enqueued arrival scan triggered.${NC}"
+                $PREF_VERBOSE_LOGGING && log "[ENQ-ARR]    Enqueued arrival scan triggered."
 
                 # WAIT 5 SECONDS
                 sleep 5
@@ -875,7 +856,7 @@ while true; do
 
             elif [ "$data" == "depart" ]; then
                 # LOG
-                $PREF_VERBOSE_LOGGING && log "${GREEN}[ENQ-DEP]    ${NC}Enqueued depart scan triggered.${NC}"
+                $PREF_VERBOSE_LOGGING && log "[ENQ-DEP]    Enqueued depart scan triggered."
 
                 # WAIT 5 SECONDS
                 sleep 5
@@ -1021,10 +1002,10 @@ while true; do
                 # IGNORE OR PASS MQTT INSTRUCTION?
                 scan_type_diff=$((timestamp - last_arrival_scan))
                 if [ "$scan_type_diff" -gt "$PREF_MINIMUM_TIME_BETWEEN_SCANS" ]; then
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${GREEN}pass mqtt${NC}] arrive scan requested ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [pass mqtt] arrive scan requested "
                     perform_arrival_scan
                 else
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${RED}fail mqtt${NC}] arrive scan rejected due to recent scan ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [fail mqtt] arrive scan rejected due to recent scan "
                 fi
 
             elif [[ $mqtt_topic_branch =~ .*KNOWN\ DEVICE\ STATES.* ]]; then
@@ -1080,7 +1061,7 @@ while true; do
                             mapfile -t known_static_addresses < <(sed 's/#.\{0,\}//gi' < "$PUB_CONFIG" | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" )
 
                             # LOGGING
-                            $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${GREEN}pass mqtt${NC}] new static device ${GREEN}$mac${NC} added with alias ${GREEN}${name:-none}${NC}"
+                            $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [pass mqtt] new static device $mac added with alias ${name:-none}"
 
                             # PERFORM ARRIVAL SCAN FOR NEW DEVICE
                             perform_arrival_scan
@@ -1100,24 +1081,24 @@ while true; do
                             mapfile -t known_static_addresses < <(sed 's/#.\{0,\}//gi' < "$PUB_CONFIG" | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" )
 
                             # LOGGING
-                            $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${GREEN}pass mqtt${NC}] removed static device ${GREEN}$mac${NC}"
+                            $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [pass mqtt] removed static device $mac"
 
                             # PERFORM DEPARTURE SCAN TO MAKE SURE THIS DEVICE IS GONE
                             perform_departure_scan
                         fi
                     fi
                 else
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${RED}fail mqtt${NC}] new static device request did not contain a device address ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [fail mqtt] new static device request did not contain a device address "
                 fi
 
             elif [[ $mqtt_topic_branch =~ .*DEPART.* ]]; then
                 # IGNORE OR PASS MQTT INSTRUCTION?
                 scan_type_diff=$((timestamp - last_depart_scan))
                 if [ "$scan_type_diff" -gt "$PREF_MINIMUM_TIME_BETWEEN_SCANS" ]; then
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${GREEN}pass mqtt${NC}] depart scan requested ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [pass mqtt] depart scan requested "
                     perform_departure_scan
                 else
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${RED}fail mqtt${NC}] depart scan rejected due to recent scan ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [fail mqtt] depart scan rejected due to recent scan "
                 fi
 
             elif [[ $mqtt_topic_branch =~ .*RSSI.* ]]; then
@@ -1126,27 +1107,27 @@ while true; do
 
                 # ONLY EVER 5 MINUTES
                 if [ "$difference_last_rssi" -gt "100" ] || [ -z "$last_rssi_scan" ]; then
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${GREEN}pass mqtt${NC}] rssi update scan requested ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [pass mqtt] rssi update scan requested "
                     connectable_present_devices
                     last_rssi_scan=$(date +%s)
                 else
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${RED}fail mqtt${NC}] rssi update scan rejected due to recent scan ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [fail mqtt] rssi update scan rejected due to recent scan "
                 fi
 
             elif [[ $mqtt_topic_branch =~ .*RESTART.* ]]; then
-                $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${GREEN}pass mqtt${NC}] service restart requested ${NC}"
+                $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [pass mqtt] service restart requested "
 
                 # RESTART SYSTEM
                 systemctl restart monitor.service
                 exit 0
 
             elif [[ $mqtt_topic_branch =~ .*ECHO.* ]] && [[ -z "$data_of_instruction" ]]; then
-                $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${GREEN}pass mqtt${NC}] echo  ${NC}"
+                $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [pass mqtt] echo  "
 
                 mqtt_echo
 
             elif [[ $mqtt_topic_branch =~ .*UPDATEBETA.* ]]; then
-                $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${GREEN}pass mqtt${NC}] beta update requested ${NC}"
+                $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [pass mqtt] beta update requested "
 
                 # GIT FETCH
                 git fetch
@@ -1160,7 +1141,7 @@ while true; do
                 exit 0
 
             elif [[ $mqtt_topic_branch =~ .*UPDATE.* ]]; then
-                $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-INST]    ${NC}[${GREEN}pass mqtt${NC}] update requested ${NC}"
+                $PREF_VERBOSE_LOGGING && log "[CMD-INST]    [pass mqtt] update requested "
 
                 # GIT FETCH
                 git fetch
@@ -1175,33 +1156,33 @@ while true; do
 
             elif [[ ${mqtt_topic_branch^^} =~ .*START.* ]] || [[ ${mqtt_topic_branch^^} =~ .*END.* ]] || [[ ${mqtt_topic_branch^^} =~ .*STATUS.* ]]; then
                 # IGNORE ERRORS
-                #$PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-SCAN]    ${NC}[${RED}ignore mqtt${NC}] ${BLUE}topic:${NC} $topic_path_of_instruction ${BLUE}data:${NC} $data_of_instruction${NC}"
+                #$PREF_VERBOSE_LOGGING && log "[CMD-SCAN]" "[ignore mqtt] topic: $topic_path_of_instruction data: $data_of_instruction"
                 continue
 
             elif [[ ${mqtt_topic_branch^^} =~ .*[0-9A-F:-]{2,}.* ]]; then
                 # LOG THE OUTPUT
-                #log "${GREEN}[CMD-INST]    ${NC}[${ORANGE}ignored mqtt${NC}] ${BLUE}topic:${NC} $topic_path_of_instruction ${BLUE}data:${NC} $data_of_instruction${NC}"
+                #log "[CMD-INST]" "[ignored mqtt] topic: $topic_path_of_instruction data: $data_of_instruction"
                 continue
 
             else
                 # LOG THE OUTPUT
-                #log "${GREEN}[CMD-INST]    ${NC}[${RED}fail mqtt${NC}] ${BLUE}topic:${NC} $topic_path_of_instruction ${BLUE}data:${NC} $data_of_instruction${NC}"
+                #log "[CMD-INST]    [fail mqtt] topic: $topic_path_of_instruction data: $data_of_instruction"
 
                 # DO A LITTLE SPELL CHECKING HERE
                 if [[ ${mqtt_topic_branch^^} =~ .*ARR.* ]]; then
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-SUGG]    ${NC}[${RED}fail mqtt${NC}] did you mean .../scan/${RED}arrive${NC}? ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]    [fail mqtt] did you mean .../scan/arrive? "
                 elif [[ ${mqtt_topic_branch^^} =~ .*DEP.* ]]; then
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-SUGG]    ${NC}[${RED}fail mqtt${NC}] did you mean .../scan/${RED}depart${NC}? ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]    [fail mqtt] did you mean .../scan/depart? "
                 elif [[ ${mqtt_topic_branch^^} =~ .*BET.* ]]; then
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-SUGG]    ${NC}[${RED}fail mqtt${NC}] did you mean .../scan/${RED}updatebeta${NC}? ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]    [fail mqtt] did you mean .../scan/updatebeta? "
                 elif [[ ${mqtt_topic_branch^^} =~ .*RSS.* ]]; then
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-SUGG]    ${NC}[${RED}fail mqtt${NC}] did you mean .../scan/${RED}rssi${NC}? ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]    [fail mqtt] did you mean .../scan/rssi? "
                 elif [[ ${mqtt_topic_branch^^} =~ .*STAR.* ]]; then
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-SUGG]    ${NC}[${RED}fail mqtt${NC}] did you mean .../scan/${RED}restart${NC}? ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]    [fail mqtt] did you mean .../scan/restart? "
                 elif [[ ${mqtt_topic_branch^^} =~ .*DAT.* ]]; then
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-SUGG]    ${NC}[${RED}fail mqtt${NC}] did you mean .../scan/${RED}update${NC} or .../scan/${RED}updatebeta${NC}? ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]    [fail mqtt] did you mean .../scan/update or .../scan/updatebeta? "
                 elif [[ ${mqtt_topic_branch^^} =~ .*ECH.* ]]; then
-                    $PREF_VERBOSE_LOGGING && log "${GREEN}[CMD-SUGG]    ${NC}[${RED}fail mqtt${NC}] did you mean .../scan/${RED}echo${NC} or .../scan/${RED}updatebeta${NC}? ${NC}"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]    [fail mqtt] did you mean .../scan/echo or .../scan/updatebeta? "
                 fi
             fi
 
@@ -1275,7 +1256,7 @@ while true; do
                     # REMOVE FROM RANDOM DEVICE LOG
                     unset "random_device_log[$key]"
                     unset "rssi_log[$key]"
-                    [ -z "${blacklisted_devices[$key]}" ] && log "${BLUE}[DEL-RAND]    ${NC}RAND $key expired after $difference seconds ${NC}"
+                    [ -z "${blacklisted_devices[$key]}" ] && log "[DEL-RAND]    RAND $key expired after $difference seconds "
 
                     #AT LEAST ONE DEVICE EXPIRED
                     should_scan=true
@@ -1396,8 +1377,8 @@ while true; do
                         unset "advertisement_interval_observation[$beacon_mac_found]"
 
                         # PUBLISH EXPIRATION
-                        [ "$PREF_BEACON_MODE" == true ] && [ -z "${blacklisted_devices[$beacon_uuid_found]}" ] && log "${BLUE}[DEL-BEAC]    ${NC}BEAC $beacon_uuid_found expired after $difference seconds ${NC}"
-                        [ "$PREF_BEACON_MODE" == true ] && [ -z "${blacklisted_devices[$beacon_mac_found]}" ] && log "${BLUE}[DEL-PUBL]    ${NC}BEAC $beacon_mac_found expired after $difference seconds ${NC}"
+                        [ "$PREF_BEACON_MODE" == true ] && [ -z "${blacklisted_devices[$beacon_uuid_found]}" ] && log "[DEL-BEAC]    BEAC $beacon_uuid_found expired after $difference seconds "
+                        [ "$PREF_BEACON_MODE" == true ] && [ -z "${blacklisted_devices[$beacon_mac_found]}" ] && log "[DEL-PUBL]    BEAC $beacon_mac_found expired after $difference seconds "
 
                         [ "$PREF_BEACON_MODE" == true ] && [ -z "${blacklisted_devices[$beacon_uuid_found]}" ] && publish_presence_message "id=$beacon_uuid_found" "confidence=0" "last_seen=$most_recent_beacon"
                         [ "$PREF_BEACON_MODE" == true ] && [ -z "${blacklisted_devices[$beacon_mac_found]}" ] && publish_presence_message "id=$beacon_mac_found" "confidence=0" "last_seen=$most_recent_beacon"
@@ -1409,7 +1390,7 @@ while true; do
                         # REMOVE FROM BEACON ASSOCIATION
                         unset "advertisement_interval_observation[$key]"
 
-                        [ "$PREF_BEACON_MODE" == true ] && [ -z "${blacklisted_devices[$key]}" ] && log "${BLUE}[DEL-PUBL]    ${NC}PUBL $key expired after $difference seconds ${NC}"
+                        [ "$PREF_BEACON_MODE" == true ] && [ -z "${blacklisted_devices[$key]}" ] && log "[DEL-PUBL]    PUBL $key expired after $difference seconds "
 
                         # REPORT PRESENCE OF DEVICE
                         [ "$PREF_BEACON_MODE" == true ] && [ -z "${blacklisted_devices[$key]}" ] && publish_presence_message "id=$key" "confidence=0" "last_seen=$last_seen"
@@ -1690,7 +1671,7 @@ while true; do
                 [ "$rssi_latest" == "-200" ] && change_type="initial reading" && should_update=true
 
                 # ONLY PRINT IF WE HAVE A CHANCE OF A CERTAIN MAGNITUDE
-                [ -z "${blacklisted_devices[$mac]}" ] && [ "$abs_rssi_change" -gt "$PREF_RSSI_CHANGE_THRESHOLD" ] && log "${CYAN}[CMD-RSSI]    ${NC}$cmd $mac ${GREEN}${NC}RSSI: ${rssi:-100} dBm ($change_type | $abs_rssi_change dBm) ${NC}" && should_update=true
+                [ -z "${blacklisted_devices[$mac]}" ] && [ "$abs_rssi_change" -gt "$PREF_RSSI_CHANGE_THRESHOLD" ] && log "[CMD-RSSI]    $cmd $mac RSSI: ${rssi:-100} dBm ($change_type | $abs_rssi_change dBm) " && should_update=true
             fi
         fi
 
@@ -1729,7 +1710,7 @@ while true; do
             [ "$did_change" == true ] && [ "$current_state" == "1" ] && $PREF_TRIGGER_MODE_REPORT_OUT && publish_cooperative_scan_message "arrive"
 
             # PRINT RAW COMMAND; DEBUGGING
-            log "${CYAN}[CMD-$cmd]    ${NC}$mac ${GREEN}$debug_name ${NC} $manufacturer${NC}"
+            log "[CMD-$cmd]    $mac $debug_name  $manufacturer"
 
         elif [ "$cmd" == "BEAC" ] && [ "$PREF_BEACON_MODE" == true ] && ([ "$should_update" == true ] || [ "$is_new" == true ]); then
             # PROVIDE USEFUL LOGGING
@@ -1739,7 +1720,7 @@ while true; do
                 [ -n "${expiring_device_log[$mac]}" ] && unset "expiring_device_log[$mac]"
 
                 # LOG
-                log "${GREEN}[CMD-$cmd]    ${NC}$mac ${GREEN}$uuid $major $minor ${NC}$name${NC}"
+                log "[CMD-$cmd]    $mac $uuid $major $minor $name"
                 publish_presence_message  \
                   "id=$uuid_reference" \
                   "confidence=100" \
@@ -1753,7 +1734,7 @@ while true; do
                   "movement=$change_type"
 
                 # LOG
-                log "${PURPLE}[CMD-PUBL]${NC}    $mac ${GREEN}$name${NC} ${BLUE}$manufacturer${NC} $rssi dBm"
+                log "[CMD-PUBL]    $mac $name $manufacturer $rssi dBm"
 
                 publish_presence_message \
                   "id=$mac" \
@@ -1775,7 +1756,7 @@ while true; do
                 # FIND NAME
                 expected_name="$(determine_name "$mac")"
 
-                log "${PURPLE}[CMD-$cmd]${NC}    $mac ${GREEN}$name${NC} ${BLUE}$manufacturer${NC} $rssi dBm"
+                log "[CMD-$cmd]    $mac $name $manufacturer $rssi dBm"
                 publish_presence_message \
                   "id=$mac" \
                   "confidence=100" \
@@ -1796,14 +1777,14 @@ while true; do
                     # REJECTION FILTER
                     if [[ ${flags,,} =~ ${PREF_FAIL_FILTER_ADV_FLAGS_ARRIVE,,} ]] || [[ ${manufacturer,,} =~ ${PREF_FAIL_FILTER_MANUFACTURER_ARRIVE,,} ]]; then
 
-                        $PREF_VERBOSE_LOGGING && log "${RED}[CMD-$cmd]${NC}    [${RED}failed filter${NC}] data: ${BLUE}${mac:-none}${NC} pdu: ${BLUE}${pdu_header:-none}${NC} rssi: ${BLUE}${rssi:-UKN} dBm${NC} flags: ${RED}${flags:-none}${NC} man: ${RED}${manufacturer:-unknown}${NC} delay: ${BLUE}${instruction_delay:-UKN}${NC}"
+                        $PREF_VERBOSE_LOGGING && log "[CMD-$cmd]    [failed filter] data: ${mac:-none} pdu: ${pdu_header:-none} rssi: ${rssi:-UKN} dBm flags: ${flags:-none} man: ${manufacturer:-unknown} delay: ${instruction_delay:-UKN}"
                         continue
                     fi
 
                     # FLAG AND MFCG FILTER
                     if [[ ${flags,,} =~ ${PREF_PASS_FILTER_ADV_FLAGS_ARRIVE,,} ]] && [[ ${manufacturer,,} =~ ${PREF_PASS_FILTER_MANUFACTURER_ARRIVE,,} ]]; then
                         # PROVIDE USEFUL LOGGING
-                        $PREF_VERBOSE_LOGGING && log "${RED}[CMD-$cmd]${NC}    [${GREEN}passed filter${NC}] data: ${BLUE}${mac:-none}${NC} pdu: ${BLUE}${pdu_header:-none}${NC} rssi: ${BLUE}${rssi:-UKN} dBm${NC} flags: ${BLUE}${flags:-none}${NC} man: ${BLUE}${manufacturer:-unknown}${NC} delay: ${BLUE}${instruction_delay:-UKN}${NC}"
+                        $PREF_VERBOSE_LOGGING && log "[CMD-$cmd]    [passed filter] data: ${mac:-none} pdu: ${pdu_header:-none} rssi: ${rssi:-UKN} dBm flags: ${flags:-none} man: ${manufacturer:-unknown} delay: ${instruction_delay:-UKN}"
 
                         # WE ARE PERFORMING THE FIRST ARRIVAL SCAN?
                         first_arrive_scan=false
@@ -1814,7 +1795,7 @@ while true; do
                         continue
                     else
                         # PROVIDE USEFUL LOGGING
-                        $PREF_VERBOSE_LOGGING && log "${RED}[CMD-$cmd]${NC}    [${RED}failed filter${NC}] data: ${BLUE}${mac:-none}${NC} pdu: ${BLUE}${pdu_header:-none}${NC} rssi: ${BLUE}${rssi:-UKN} dBm${NC} flags: ${RED}${flags:-none}${NC} man: ${RED}${manufacturer:-unknown}${NC} delay: ${BLUE}${instruction_delay:-UKN}${NC}"
+                        $PREF_VERBOSE_LOGGING && log "[CMD-$cmd]    [failed filter] data: ${mac:-none} pdu: ${pdu_header:-none} rssi: ${rssi:-UKN} dBm flags: ${flags:-none} man: ${manufacturer:-unknown} delay: ${instruction_delay:-UKN}"
                         continue
                     fi
                 fi
@@ -1824,14 +1805,14 @@ while true; do
             # REJECTION FILTER
             if [[ ${flags,,} =~ ${PREF_FAIL_FILTER_ADV_FLAGS_ARRIVE,,} ]] || [[ ${manufacturer,,} =~ ${PREF_FAIL_FILTER_MANUFACTURER_ARRIVE,,} ]]; then
 
-                $PREF_VERBOSE_LOGGING && log "${RED}[CMD-$cmd]${NC}    [${RED}failed filter${NC}] data: ${BLUE}${mac:-none}${NC} pdu: ${BLUE}${pdu_header:-none}${NC} rssi: ${BLUE}${rssi:-UKN} dBm${NC} flags: ${RED}${flags:-none}${NC} man: ${RED}${manufacturer:-unknown}${NC} delay: ${BLUE}${instruction_delay:-UKN}${NC}"
+                $PREF_VERBOSE_LOGGING && log "[CMD-$cmd]    [failed filter] data: ${mac:-none} pdu: ${pdu_header:-none} rssi: ${rssi:-UKN} dBm flags: ${flags:-none} man: ${manufacturer:-unknown} delay: ${instruction_delay:-UKN}"
                 continue
             fi
 
             # FLAG AND MFCG FILTER
             if [[ ${flags,,} =~ ${PREF_PASS_FILTER_ADV_FLAGS_ARRIVE,,} ]] && [[ ${manufacturer,,} =~ ${PREF_PASS_FILTER_MANUFACTURER_ARRIVE,,} ]]; then
                 # PROVIDE USEFUL LOGGING
-                $PREF_VERBOSE_LOGGING && log "${RED}[CMD-$cmd]${NC}    [${GREEN}passed filter${NC}] data: ${BLUE}${mac:-none}${NC} pdu: ${BLUE}${pdu_header:-none}${NC} rssi: ${BLUE}${rssi:-UKN} dBm${NC} flags: ${BLUE}${flags:-none}${NC} man: ${BLUE}${manufacturer:-unknown}${NC} delay: ${BLUE}${instruction_delay:-UKN}${NC}"
+                $PREF_VERBOSE_LOGGING && log "[CMD-$cmd]    [passed filter] data: ${mac:-none} pdu: ${pdu_header:-none} rssi: ${rssi:-UKN} dBm flags: ${flags:-none} man: ${manufacturer:-unknown} delay: ${instruction_delay:-UKN}"
 
                 # WE ARE PERFORMING THE FIRST ARRIVAL SCAN?
                 first_arrive_scan=false
@@ -1842,7 +1823,7 @@ while true; do
                 continue
             else
                 # PROVIDE USEFUL LOGGING
-                $PREF_VERBOSE_LOGGING && log "${RED}[CMD-$cmd]${NC}    [${RED}failed filter${NC}] data: ${BLUE}${mac:-none}${NC} pdu: ${BLUE}${pdu_header:-none}${NC} rssi: ${BLUE}${rssi:-UKN} dBm${NC} flags: ${RED}${flags:-none}${NC} man: ${RED}${manufacturer:-unknown}${NC} delay: ${BLUE}${instruction_delay:-UKN}${NC}"
+                $PREF_VERBOSE_LOGGING && log "[CMD-$cmd]    [failed filter] data: ${mac:-none} pdu: ${pdu_header:-none} rssi: ${rssi:-UKN} dBm flags: ${flags:-none} man: ${manufacturer:-unknown} delay: ${instruction_delay:-UKN}"
 
                 continue
             fi

@@ -25,13 +25,13 @@ if [ "$previous_version" != "$version" ]; then
     [ -z "$previous_version" ] && previous_version="Unknown"
 
     #UPDATE REPORT
-    printf "%s\n" "> ${GREEN}updated${NC} $(basename "$0") (v. $previous_version) -> (v. $version)..."
+    printf "%s\n" "> updated $(basename "$0") (v. $previous_version) -> (v. $version)..."
 
     #RECORD UPDATED VERSION
     printf "%s\n" "$version" > ".previous_version"
 else
     #STANDARD RUN
-    printf "%s\n" "> ${GREEN}starting${NC} $(basename "$0") (v. $version)..."
+    printf "%s\n" "> starting $(basename "$0") (v. $version)..."
 fi
 
 # ----------------------------------------------------------------------------------------
@@ -125,17 +125,17 @@ while getopts "h?vfFbut:EgSRCmrsVadxD:c:" opt; do
             ;;
 
         r)  PREF_PERIODIC_MODE=true
-            printf "%s\n" "> ${ORANGE}warning:${NC} periodic scan mode may cause interference with 2.4GHz networks if run on a Raspberry Pi"
+            printf "%s\n" "> warning: periodic scan mode may cause interference with 2.4GHz networks if run on a Raspberry Pi"
             ;;
         v)
             printf "%s\n" "$VERSION"
             exit 0
             ;;
         F)
-            PREF_FILTER_DEBUG_LOGGING=true && printf "%s\n" "> ${ORANGE}warning:${NC} filter logging is enabled. this setting is only for informational and debug purposes"
+            PREF_FILTER_DEBUG_LOGGING=true && printf "%s\n" "> warning: filter logging is enabled. this setting is only for informational and debug purposes"
             ;;
         V)
-            PREF_VERBOSE_LOGGING=true && printf "%s\n" "> ${ORANGE}warning:${NC} verbose logging is enabled. this setting is only for informational and debugging purposes"
+            PREF_VERBOSE_LOGGING=true && printf "%s\n" "> warning: verbose logging is enabled. this setting is only for informational and debugging purposes"
             ;;
         c)
             #GET TARGET MAC ADDRESS
@@ -156,7 +156,7 @@ while getopts "h?vfFbut:EgSRCmrsVadxD:c:" opt; do
             return_data=$(hcitool cc $target_mac 2>&1 && hcitool auth $target_mac 2>&1 && hcitool dc $target_mac 2>&1)
 
             #ERROR REPORTING
-            [[ $return_data =~ .*error.* ]] && printf "%s\n" "> ${RED}error: ${NC}connection to $target_mac failed" || printf "%s\n" "> connection created to $target_mac"
+            [[ $return_data =~ .*error.* ]] && printf "%s\n" "> error: connection to $target_mac failed" || printf "%s\n" "> connection created to $target_mac"
 
             exit 0
             ;;
@@ -191,14 +191,14 @@ while getopts "h?vfFbut:EgSRCmrsVadxD:c:" opt; do
                     ;;
                 da|ad|rda|rad|dra|ard|dar|adr) PREF_TRIGGER_MODE_ARRIVE=true && PREF_TRIGGER_MODE_DEPART==true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> trigger mode: scan only (both on arrive and depart) on trigger"
                     ;;
-                *) printf "%s\n" "> ${ORANGE}warning: ${NC}unknown trigger mode: $OPTARG"
+                *) printf "%s\n" "> warning: unknown trigger mode: $OPTARG"
                 ;;
             esac
             ;;
         a)  PREF_REPORT_ALL_MODE=true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> report all scan results mode enabled"
             ;;
         D)  PREF_CONFIG_DIR=$OPTARG && printf "%s\n" "> using custom config directory [$PREF_CONFIG_DIR]"
-            [ ! -d "$PREF_CONFIG_DIR" ] && printf "%s\n" "> ${RED}error: ${NC}config directory [$PREF_CONFIG_DIR] doesn't exist" && exit 1
+            [ ! -d "$PREF_CONFIG_DIR" ] && printf "%s\n" "> error: config directory [$PREF_CONFIG_DIR] doesn't exist" && exit 1
                 ;;
         *)    printf "%s\n" "> unknown or depreciated argument: $opt"
     esac

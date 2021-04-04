@@ -174,7 +174,7 @@ mqtt_error_handler () {
             last_error_message="$print_message"
 
             if [ "$duplicate_error_count" -gt "3" ]; then
-                log "${RED}[CMD-ERRO]${NC}    ${RED}fatal mqtt error - messages may not be delivered as intended ($print_message / $duplicate_error_count)${NC}"
+                log "[CMD-ERRO]    fatal mqtt error - messages may not be delivered as intended ($print_message / $duplicate_error_count)"
                 duplicate_error_count=0
                 last_error_message=""
             fi
@@ -184,7 +184,7 @@ mqtt_error_handler () {
 
         elif [ -n "$print_message" ]; then
             #MESSAGE IS NOT REPEATED, SO FEEL FREE TO LOG IT
-            log "${YELLOW}[CMD-MQTT]${NC}    ${YELLOW}warning: $print_message ${NC}"
+            log "[CMD-MQTT]    warning: $print_message "
             duplicate_error_count=0
             last_error_message="$print_message"
 
@@ -222,7 +222,7 @@ publish_rssi_message () {
 
         local topic="$mqtt_topicpath/$mqtt_publisher_identity/$mqtt_topic_branch/rssi"
 
-        $PREF_VERBOSE_LOGGING && log "${YELLOW}[CMD-MQTT]${NC}    ${YELLOW}$topic${NC}"
+        $PREF_VERBOSE_LOGGING && log "[CMD-MQTT]    $topic"
 
         #POST TO MQTT
         while mqtt_error_handler $($mosquitto_pub_path \
@@ -320,7 +320,7 @@ publish_presence_message () {
 
                  #PRINT FOR DEVICE TRACKER
                  if [ $PREF_VERBOSE_LOGGING == true ]; then
-                     log "${YELLOW}[CMD-MQTT]${NC}    ${YELLOW}$topic/$PREF_DEVICE_TRACKER_TOPIC_BRANCH $device_tracker_message${NC}"
+                     log "[CMD-MQTT]    $topic/$PREF_DEVICE_TRACKER_TOPIC_BRANCH $device_tracker_message"
                 fi
             fi
          fi
@@ -342,12 +342,12 @@ publish_presence_message () {
         if [ $PREF_VERBOSE_LOGGING == true ]; then
 
 
-            log "${YELLOW}[CMD-MQTT]${NC}    ${YELLOW}$topic${NC}"
+            log "[CMD-MQTT]    $topic"
             #REDACTIONS?
             if [ "$PREF_REDACT" == true ]; then
-                printf "%s\n" "${YELLOW}$(json_unformat "$message" | sed "s/\([0-9A-Fa-f]\{2\}:\)\{5\}/ [REDACTED]:/gi;s/\([0-9A-Fa-f-]\{36\}\)/ [REDACTED]/gi" )${NC}"
+                printf "%s\n" "$(json_unformat "$message" | sed "s/\([0-9A-Fa-f]\{2\}:\)\{5\}/ [REDACTED]:/gi;s/\([0-9A-Fa-f-]\{36\}\)/ [REDACTED]/gi" )"
             else
-                printf "%s\n" "${YELLOW}$(json_unformat "$message")${NC}"
+                printf "%s\n" "$(json_unformat "$message")"
             fi
 
         #EXTRACT RAW CONFIDENC
@@ -357,7 +357,7 @@ publish_presence_message () {
             confidence_printable="${BASH_REMATCH[1]}"
 
             #EXTRACT CONFIDENCE VALUE TO POST
-            log "${YELLOW}[CMD-MQTT]${NC}    ${YELLOW}$topic { ... confidence : $confidence_printable ... } ${NC}"
+            log "[CMD-MQTT]    $topic { ... confidence : $confidence_printable ... } "
         fi
     fi
 }
