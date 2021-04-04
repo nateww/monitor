@@ -43,22 +43,22 @@ source './support/log'
 source './support/data'
 source './support/btle'
 source './support/time'
+
 # ------------------------------------------------------------------------------
 # CLEANUP ROUTINE
 # ------------------------------------------------------------------------------
 clean() {
-    #CLEANUP FOR TRAP
-    pkill -f monitor.sh
+    # REMOVE PIPES
+    rm -f main_pipe
+    rm -f log_pipe
+    rm -f packet_pipe
 
-    #REMOVE PIPES
-    rm main_pipe &>/dev/null
-    rm log_pipe &>/dev/null
-    rm packet_pipe &>/dev/null
-
-    #MESSAGE
+    # MESSAGE
     echo 'Exited.'
-}
 
+    # CLEANUP FOR TRAP
+    pkill -f monitor.sh
+}
 trap "clean" EXIT
 
 # ------------------------------------------------------------------------------
@@ -76,15 +76,15 @@ for pid in $(pidof -x "$(basename "$0")"); do
 done
 
 # SETUP MAIN PIPE
-rm main_pipe &>/dev/null
+rm -f main_pipe
 mkfifo main_pipe
 
 # SETUP LOG PIPE
-rm log_pipe &>/dev/null
+rm -f log_pipe
 mkfifo log_pipe
 
 # SETUP BTLE PIPE
-rm packet_pipe &>/dev/null
+rm -f packet_pipe
 mkfifo packet_pipe
 
 # DEFINE DEVICE TRACKING VARS
@@ -139,7 +139,7 @@ previously_connected_devices=$(echo "paired-devices" | bluetoothctl | grep -Eio 
 # POPULATE KNOWN DEVICE ADDRESS
 for addr in "${known_static_addresses[@]^^}"; do
     # WAS THERE A NAME HERE?
-    known_name=$(grep -i "$addr" $PUB_CONFIG | sed "s/^.*$addr//i" | tr "\\t" " " | sed 's/  */ /gi;s/#.\{0,\}//gi' | sed "s/[ \t]+$//" )
+    known_name=$(grep -i "$addr" $PUB_CONFIG | sed "s/^.*$addr\s*//i" | sed "s/\s*#.*//g" | sed "s/[ \t]+$//g")
 
     # IF THE VALUE DOES NOT EXIST, USE THE KEY (MAC ADDRESS INSTEAD)
     alias_value=${known_name//[^A-Za-z0-9]/_}
@@ -148,7 +148,7 @@ for addr in "${known_static_addresses[@]^^}"; do
     alias_value=${alias_value,,}
 
     # REMOVE FINAL UNDERSCORES SHOULD THERE BE ONE
-    alias_value=$(echo "$alias_value" | sed 's/[^0-9a-z]\{1,\}$//gi;s/^[^0-9a-z]\{1,\}//gi;s/__*/_/gi')
+    alias_value=$(echo "$alias_value" | sed 's/_$//g')
 
     #================= SHOULD WE USE AN ALIAS? =====================
     alias_value=${alias_value:-$addr}
@@ -183,7 +183,7 @@ done
 # POPULATE KNOWN DEVICE ADDRESS
 for addr in "${known_static_beacons[@]^^}"; do
     # WAS THERE A NAME HERE?
-    known_name=$(grep -i "$addr" $PUB_CONFIG | sed "s/^.*$addr//i" | tr "\\t" " " | sed 's/  */ /gi;s/#.\{0,\}//gi' | sed "s/[ \t]+$//" )
+    known_name=$(grep -i "$addr" $PUB_CONFIG | sed "s/^.*$addr\s*//i" | sed "s/\s*#.*//g" | sed "s/[ \t]+$//g")
 
     # IF THE VALUE DOES NOT EXIST, USE THE KEY (MAC ADDRESS INSTEAD)
     alias_value=${known_name//[^A-Za-z0-9]/_}
@@ -191,8 +191,8 @@ for addr in "${known_static_beacons[@]^^}"; do
     # LOWERCASE
     alias_value=${alias_value,,}
 
-    # REMOVE FINAL UNDERSCORES SHOULD THEY BE NECESSARY
-    alias_value=$(echo "$alias_value" | sed 's/[^0-9a-z]\{1,\}$//gi;s/^[^0-9a-z]\{1,\}//gi;s/__*/_/gi')
+    # REMOVE FINAL UNDERSCORES SHOULD THERE BE ONE
+    alias_value=$(echo "$alias_value" | sed 's/_$//g')
 
     #================= SHOULD WE USE AN ALIAS? =====================
     alias_value=${alias_value:-$addr}
@@ -331,7 +331,7 @@ scannable_devices_with_state() {
     done
 
     # RETURN LIST, CLEANING FOR EXCESS SPACES OR STARTING WITH SPACES
-    return_list=$(echo "$return_list" | sed 's/^ //gi;s/ $//gi;s/  */ /gi')
+    return_list=$(echo "$return_list" | sed 's/^[ ]+//g;s/[ ]+$//g;s/[ ]+/ /g')
     echo "$return_list"
 }
 
@@ -451,11 +451,11 @@ perform_complete_scan() {
                   "type=KNOWN_MAC"
 
                 # REMOVE FROM SCAN
-                devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/  */ /gi")
+                devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/[ ]+/ /g")
 
             elif [ -n "$name" ] && [ "$previous_state" == "3" ]; then
                 # HERE, WE HAVE FOUND A DEVICE FOR THE FIRST TIME
-                devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/  */ /gi")
+                devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/[ ]+/ /g")
 
                 # NEED TO UPDATE STATE TO MAIN THREAD
                 echo "NAME$known_addr|$name" > main_pipe
@@ -472,7 +472,7 @@ perform_complete_scan() {
 
             elif [ -n "$name" ] && [ "$previous_state" == "1" ]; then
                 # THIS DEVICE IS STILL PRESENT; REMOVE FROM VERIFICATIONS
-                devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/  */ /gi")
+                devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/[ ]+/ /g")
 
                 # NEED TO REPORT?
                 if [[ $should_report =~ .*$known_addr.* ]] || [ "$PREF_REPORT_ALL_MODE" == true ]; then
@@ -530,7 +530,7 @@ perform_complete_scan() {
                   "-99"
 
                 # REMOVE FROM THE SCAN LIST TO THE MAIN BECAUSE THIS IS A BOOT UP
-                devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/  */ /gi")
+                devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/[ ]+/ /g")
 
                 # PUBLISH A NOT PRESENT TO THE NAME PIPE
                 echo "NAME$known_addr|" > main_pipe
@@ -639,7 +639,7 @@ perform_departure_scan() {
     local scan_active
     scan_active=true
 
-    #SCAN ACTIVE?
+    # SCAN ACTIVE?
     kill -0 "$scan_pid" >/dev/null 2>&1 && scan_active=true || scan_active=false
 
     # ONLY ASSEMBLE IF WE NEED TO SCAN FOR ARRIVAL
@@ -1040,7 +1040,7 @@ while true; do
                         # HERE, WE KNOW THAT WE HAVE A MAC ADDRESS AND A VALID INSTRUCTION
                         if [[ $mqtt_topic_branch =~ .*ADD\ STATIC\ DEVICE.* ]]; then
                             # WAS THERE A NAME HERE?
-                            name=$(echo "$data_of_instruction" | tr "\\t" " " | sed 's/  */ /gi;s/#.\{0,\}//gi' | sed "s/$mac //gi;s/  */ /gi" )
+                            name=$(echo "$data_of_instruction" | sed "s/[ \t]+/ /g" | sed 's/#.*//g' | sed "s/$mac //gi")
 
                             # IF THE VALUE DOES NOT EXIST, USE THE KEY (MAC ADDRESS INSTEAD)
                             alias_value=${name//[^A-Za-z0-9]/_}
@@ -1048,8 +1048,8 @@ while true; do
                             # LOWERCASE
                             alias_value=${alias_value,,}
 
-                            # REMOVE FINAL UNDERSCORES SHOUDL THERE BE
-                            alias_value=$(echo "$alias_value" | sed 's/[^0-9a-z]\{1,\}$//gi;s/^[^0-9a-z]\{1,\}//gi;s/__*/_/gi')
+                            # REMOVE FINAL UNDERSCORES SHOULD THERE BE ONE
+                            alias_value=$(echo "$alias_value" | sed 's/_$//g')
 
                             # ADD TO KNOWN PUBLIC DEVICE ARRAY
                             known_public_device_name[$mac]="$name"
@@ -1061,7 +1061,7 @@ while true; do
                             echo "$mac ${name:-}" >> $PUB_CONFIG
 
                             # UPDATE FROM STATIC ADDRESSES TOO
-                            mapfile -t known_static_addresses < <(sed 's/#.\{0,\}//gi' < "$PUB_CONFIG" | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" )
+                            mapfile -t known_static_addresses < <(grep -v '^#' $PUB_CONFIG | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | awk '{print $1}' | sed 's/[ \t]+$//')
 
                             # LOGGING
                             $PREF_VERBOSE_LOGGING && log "[CMD-INST]" "[pass mqtt] new static device $mac added with alias ${name:-none}"
@@ -1081,7 +1081,7 @@ while true; do
                             unset "mqtt_aliases[$mac]"
 
                             # REMOVE FROM STATIC ADDRESSES TOO
-                            mapfile -t known_static_addresses < <(sed 's/#.\{0,\}//gi' < "$PUB_CONFIG" | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" )
+                            mapfile -t known_static_addresses < <(grep -v '^#' $PUB_CONFIG | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | awk '{print $1}' | sed 's/[ \t]+$//')
 
                             # LOGGING
                             $PREF_VERBOSE_LOGGING && log "[CMD-INST]" "[pass mqtt] removed static device $mac"
@@ -1128,45 +1128,6 @@ while true; do
                 $PREF_VERBOSE_LOGGING && log "[CMD-INST]" "[pass mqtt] echo"
 
                 mqtt_echo
-
-            elif [[ $mqtt_topic_branch =~ .*UPDATEBETA.* ]]; then
-                $PREF_VERBOSE_LOGGING && log "[CMD-INST]" "[pass mqtt] beta update requested"
-
-                # GIT FETCH
-                git fetch
-                git checkout beta
-
-                # GIT PULL
-                git pull
-
-                # RESTART SYSTEM
-                systemctl restart monitor.service
-                exit 0
-
-            elif [[ $mqtt_topic_branch =~ .*UPDATE.* ]]; then
-                $PREF_VERBOSE_LOGGING && log "[CMD-INST]" "[pass mqtt] update requested"
-
-                # GIT FETCH
-                git fetch
-                git checkout master
-
-                # GIT PULL
-                git pull
-
-                # RESTART SYSTEM
-                systemctl restart monitor.service
-                exit 0
-
-            elif [[ ${mqtt_topic_branch^^} =~ .*START.* ]] || [[ ${mqtt_topic_branch^^} =~ .*END.* ]] || [[ ${mqtt_topic_branch^^} =~ .*STATUS.* ]]; then
-                # IGNORE ERRORS
-                #$PREF_VERBOSE_LOGGING && log "[CMD-SCAN]" "[ignore mqtt] topic: $topic_path_of_instruction data: $data_of_instruction"
-                continue
-
-            elif [[ ${mqtt_topic_branch^^} =~ .*[0-9A-F:-]{2,}.* ]]; then
-                # LOG THE OUTPUT
-                #log "[CMD-INST]" "[ignored mqtt] topic: $topic_path_of_instruction data: $data_of_instruction"
-                continue
-
             else
                 # LOG THE OUTPUT
                 #log "[CMD-INST]" "[fail mqtt] topic: $topic_path_of_instruction data: $data_of_instruction"
@@ -1176,16 +1137,12 @@ while true; do
                     $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]" "[fail mqtt] did you mean .../scan/arrive?"
                 elif [[ ${mqtt_topic_branch^^} =~ .*DEP.* ]]; then
                     $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]" "[fail mqtt] did you mean .../scan/depart?"
-                elif [[ ${mqtt_topic_branch^^} =~ .*BET.* ]]; then
-                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]" "[fail mqtt] did you mean .../scan/updatebeta?"
                 elif [[ ${mqtt_topic_branch^^} =~ .*RSS.* ]]; then
                     $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]" "[fail mqtt] did you mean .../scan/rssi?"
                 elif [[ ${mqtt_topic_branch^^} =~ .*STAR.* ]]; then
                     $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]" "[fail mqtt] did you mean .../scan/restart?"
-                elif [[ ${mqtt_topic_branch^^} =~ .*DAT.* ]]; then
-                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]" "[fail mqtt] did you mean .../scan/update or .../scan/updatebeta?"
                 elif [[ ${mqtt_topic_branch^^} =~ .*ECH.* ]]; then
-                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]" "[fail mqtt] did you mean .../scan/echo or .../scan/updatebeta?"
+                    $PREF_VERBOSE_LOGGING && log "[CMD-SUGG]" "[fail mqtt] did you mean .../scan/echo?"
                 fi
             fi
 
@@ -1194,8 +1151,7 @@ while true; do
 
             # ONLY WHEN BLUETOOTH IS OFF DO WE ATTEMPT TO SCAN FOR RSSI OF KNOWN/CONNECTED DEVICES
             if [ "$cmd" == "BOFF" ]; then
-                # FIND RSSI OF KNOWN DEVICES PREVIOUSLY CONNECTED WHILE HICTOOL
-                # IS NOT SCANNING
+                # FIND RSSI OF KNOWN DEVICES PREVIOUSLY CONNECTED WHILE HICTOOL IS NOT SCANNING
                 difference_last_rssi=$((timestamp - last_rssi_scan))
 
                 # ONLY EVER 5 MINUTES
@@ -1245,10 +1201,10 @@ while true; do
 
                 # FIND THE EXPIRATION INTERVAL FOR THIS PARTICULAR BEACON
                 beacon_specific_expiration_interval="${advertisement_interval_observation[$key]}"
-                beacon_specific_expiration_interval=$(( beacon_specific_expiration_interval * PREF_DEPART_SCAN_ATTEMPTS ))
+                beacon_specific_expiration_interval=$((beacon_specific_expiration_interval * PREF_DEPART_SCAN_ATTEMPTS ))
 
                 # SET EXPIRATION
-                beacon_specific_expiration_interval=$(( beacon_specific_expiration_interval > 45 && beacon_specific_expiration_interval  < PREF_RANDOM_DEVICE_EXPIRATION_INTERVAL ? beacon_specific_expiration_interval : PREF_RANDOM_DEVICE_EXPIRATION_INTERVAL ))
+                beacon_specific_expiration_interval=$((beacon_specific_expiration_interval > 45 && beacon_specific_expiration_interval  < PREF_RANDOM_DEVICE_EXPIRATION_INTERVAL ? beacon_specific_expiration_interval : PREF_RANDOM_DEVICE_EXPIRATION_INTERVAL ))
 
                 # CONTINUE IF DEVICE HAS NOT BEEN SEEN OR DATE IS CORRUPT
                 [ -z "$last_seen" ] && continue
@@ -1352,10 +1308,10 @@ while true; do
                 beacon_specific_expiration_interval="${advertisement_interval_observation[$key]}"
 
                 # ADJUST TO BUFFER BASED ON USER PREFERENCES
-                beacon_specific_expiration_interval=$(( beacon_specific_expiration_interval * PREF_DEPART_SCAN_ATTEMPTS ))
+                beacon_specific_expiration_interval=$((beacon_specific_expiration_interval * PREF_DEPART_SCAN_ATTEMPTS ))
 
                 # SET EXPIRATION
-                beacon_specific_expiration_interval=$(( beacon_specific_expiration_interval > 45 && beacon_specific_expiration_interval  < PREF_BEACON_EXPIRATION ? beacon_specific_expiration_interval : PREF_BEACON_EXPIRATION ))
+                beacon_specific_expiration_interval=$((beacon_specific_expiration_interval > 45 && beacon_specific_expiration_interval  < PREF_BEACON_EXPIRATION ? beacon_specific_expiration_interval : PREF_BEACON_EXPIRATION ))
 
                 # TIMEOUT AFTER [XXX] SECONDS; ALL BEACONS HONOR THE SAME EXPRIATION THRESHOLD INCLUDING IBEACONS
                 if [ "$difference" -gt "$beacon_specific_expiration_interval" ]; then
@@ -1399,9 +1355,9 @@ while true; do
                         [ "$PREF_BEACON_MODE" == true ] && [ -z "${blacklisted_devices[$key]}" ] && publish_presence_message "id=$key" "confidence=0" "last_seen=$last_seen"
                     fi
 
-                elif [ "${observed_max_advertisement_interval:-0}" -gt "0" ] && [ "$difference" -gt "$(( (beacon_specific_expiration_interval - observed_max_advertisement_interval)  / 2 + observed_max_advertisement_interval))" ]; then
+                elif [ "${observed_max_advertisement_interval:-0}" -gt "0" ] && [ "$difference" -gt "$(((beacon_specific_expiration_interval - observed_max_advertisement_interval)  / 2 + observed_max_advertisement_interval))" ]; then
                     # SHOULD REPORT A DROP IN CONFIDENCE?
-                    percent_confidence=$(( 100 - (difference - observed_max_advertisement_interval) * 100 / (PREF_BEACON_EXPIRATION - observed_max_advertisement_interval) ))
+                    percent_confidence=$((100 - (difference - observed_max_advertisement_interval) * 100 / (PREF_BEACON_EXPIRATION - observed_max_advertisement_interval) ))
                     [ "$percent_confidence" -lt "5" ] && percent_confidence=0
 
                     if [ "$PREF_REPORT_ALL_MODE" == true ]; then
