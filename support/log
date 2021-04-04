@@ -29,42 +29,42 @@ $SERVICE_ACTIVE && launch_flag="[+]" || launch_flag="[-]"
 #FORK THE LOG FROM THE MAIN THREAD
 log_listener () {
 
-	#LOG PIPE
-	while true; do
-		#SHOULD EXIT?
-		[ "$PREF_DISABLE_LOGGING" == true ] && return 0
+    #LOG PIPE
+    while true; do
+        #SHOULD EXIT?
+        [ "$PREF_DISABLE_LOGGING" == true ] && return 0
 
-		#READ FROM THE MAIN PIPE
-		local line
-		while read line; do
+        #READ FROM THE MAIN PIPE
+        local line
+        while read line; do
 
-			#ECHO TO CONSOLE, REMOVING EXTRA SPACES
-			should_repeat=""
-			line_append=""
+            #ECHO TO CONSOLE, REMOVING EXTRA SPACES
+            should_repeat=""
+            line_append=""
 
-			#IS THIS LINE DUPLICATED?
-			if [ "$last_log_line" == "$line" ] ; then
-				duplicate_log_count=$((duplicate_log_count + 1 ))
-			else
-				duplicate_log_count=1
-			fi
+            #IS THIS LINE DUPLICATED?
+            if [ "$last_log_line" == "$line" ] ; then
+                duplicate_log_count=$((duplicate_log_count + 1 ))
+            else
+                duplicate_log_count=1
+            fi
 
-			if [ "$PREF_REDACT" == true ]; then
-				line=$(echo "$line" | sed "s/\([0-9A-Fa-f]\{2\}:\)\{5\}/ [REDACTED]:/gi;s/\([0-9A-Fa-f-]\{36\}\)/ [REDACTED]/gi" )
-				line="$line"
-			fi
+            if [ "$PREF_REDACT" == true ]; then
+                line=$(echo "$line" | sed "s/\([0-9A-Fa-f]\{2\}:\)\{5\}/ [REDACTED]:/gi;s/\([0-9A-Fa-f-]\{36\}\)/ [REDACTED]/gi" )
+                line="$line"
+            fi
 
-			#ECHO LAST LINE
-			printf "%s\n" "$launch_flag $version $(date "+%d-%m-%Y %I:%M:%S %p") $line"
-			last_log_line="$line"
+            #ECHO LAST LINE
+            printf "%s\n" "$launch_flag $version $(date "+%d-%m-%Y %I:%M:%S %p") $line"
+            last_log_line="$line"
 
-		done < log_pipe
-	done
+        done < log_pipe
+    done
 }
 
 
 #PRINT TO LOG UNLESS DUPLICATE LINE
 log() {
-	#SEND TO LOG PIPE
-	[ "$PREF_DISABLE_LOGGING" == false ] && printf "$1\n" | sed 's/  */ /g' > log_pipe
+    #SEND TO LOG PIPE
+    [ "$PREF_DISABLE_LOGGING" == false ] && printf "$1\n" | sed 's/  */ /g' > log_pipe
 }

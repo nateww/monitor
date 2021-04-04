@@ -21,17 +21,17 @@ previous_version=$(cat ".previous_version")
 #DETERMINE IF UPDATED SINCE LAST RUN
 if [ "$previous_version" != "$version" ]; then
 
-	#HAVE WE REPORTED AN UPDATE BEFORE?
-	[ -z "$previous_version" ] && previous_version="Unknown"
+    #HAVE WE REPORTED AN UPDATE BEFORE?
+    [ -z "$previous_version" ] && previous_version="Unknown"
 
-	#UPDATE REPORT
-	printf "%s\n" "> ${GREEN}updated${NC} $(basename "$0") (v. $previous_version) -> (v. $version)..."
+    #UPDATE REPORT
+    printf "%s\n" "> ${GREEN}updated${NC} $(basename "$0") (v. $previous_version) -> (v. $version)..."
 
-	#RECORD UPDATED VERSION
-	printf "%s\n" "$version" > ".previous_version"
+    #RECORD UPDATED VERSION
+    printf "%s\n" "$version" > ".previous_version"
 else
-	#STANDARD RUN
-	printf "%s\n" "> ${GREEN}starting${NC} $(basename "$0") (v. $version)..."
+    #STANDARD RUN
+    printf "%s\n" "> ${GREEN}starting${NC} $(basename "$0") (v. $version)..."
 fi
 
 # ----------------------------------------------------------------------------------------
@@ -39,8 +39,8 @@ fi
 # ----------------------------------------------------------------------------------------
 
 show_help_text() {
-	#SHOW HELPFULE
-	printf "%s\n" "
+    #SHOW HELPFULE
+    printf "%s\n" "
 
 monitor.sh
 
@@ -51,32 +51,32 @@ GNU General Public License
 
 usage:
 
-	monitor -h 	show usage information
-	monitor -R 	redact private information from logs
-	monitor -S 	silent operation (no logging)
-	monitor -c addr	create connection to bluetooth device
-	monitor -C 	clean retained messages from MQTT broker
+    monitor -h     show usage information
+    monitor -R     redact private information from logs
+    monitor -S     silent operation (no logging)
+    monitor -c addr    create connection to bluetooth device
+    monitor -C     clean retained messages from MQTT broker
 
-	monitor -V	print verbose/debug logging messages
-	monitor -v	print version number
-	monitor -d	restore to default behavior_preferences
-	monitor -u	update 'monitor.service' to current command line settings
-			(excluding -u,-V, -F, and -d flags)
+    monitor -V    print verbose/debug logging messages
+    monitor -v    print version number
+    monitor -d    restore to default behavior_preferences
+    monitor -u    update 'monitor.service' to current command line settings
+            (excluding -u,-V, -F, and -d flags)
 
-	monitor -r	repeatedly scan for arrival & departure of known devices
-	monitor -s  report all mqtt messages to a single topic with
-				\$mqtt_topicpath/\$mqtt_publisher_identity  (defined in MQTT preferences file)
+    monitor -r    repeatedly scan for arrival & departure of known devices
+    monitor -s  report all mqtt messages to a single topic with
+                \$mqtt_topicpath/\$mqtt_publisher_identity  (defined in MQTT preferences file)
 
-	monitor -f	format MQTT topics with only letters and numbers
-	monitor -a	report all known device scan results, not just changes
-	monitor -x	retain mqtt status messages
-	monitor -b	report bluetooth beacon advertisements (e.g., generic beacons, ibeacons, and so on)
-	monitor -t[adr]	scan for known devices only on mqtt trigger messages:
-				a \$mqtt_topicpath/scan/ARRIVE (defined in MQTT preferences file)
-				d \$mqtt_topicpath/scan/DEPART (defined in MQTT preferences file)
-				r send ARRIVE or DEPART messages to trigger other devices to scan
-	monitor -D [dir]	use alternative directory for configuration files
-	"
+    monitor -f    format MQTT topics with only letters and numbers
+    monitor -a    report all known device scan results, not just changes
+    monitor -x    retain mqtt status messages
+    monitor -b    report bluetooth beacon advertisements (e.g., generic beacons, ibeacons, and so on)
+    monitor -t[adr]    scan for known devices only on mqtt trigger messages:
+                a \$mqtt_topicpath/scan/ARRIVE (defined in MQTT preferences file)
+                d \$mqtt_topicpath/scan/DEPART (defined in MQTT preferences file)
+                r send ARRIVE or DEPART messages to trigger other devices to scan
+    monitor -D [dir]    use alternative directory for configuration files
+    "
 }
 
 # ----------------------------------------------------------------------------------------
@@ -115,93 +115,93 @@ PREF_MQTT_SINGLE_TOPIC_MODE=false
 PREF_PERIODIC_MODE=false
 
 while getopts "h?vfFbut:EgSRCmrsVadxD:c:" opt; do
-	case "$opt" in
-		h|\?)
-			show_help_text
-			exit 0
-			;;
-		S)
-			PREF_DISABLE_LOGGING=true && printf "%s\n" "> logging is disabled, although startup messages will still be shown"
-			;;
+    case "$opt" in
+        h|\?)
+            show_help_text
+            exit 0
+            ;;
+        S)
+            PREF_DISABLE_LOGGING=true && printf "%s\n" "> logging is disabled, although startup messages will still be shown"
+            ;;
 
-		r)  PREF_PERIODIC_MODE=true
-			printf "%s\n" "> ${ORANGE}warning:${NC} periodic scan mode may cause interference with 2.4GHz networks if run on a Raspberry Pi"
-			;;
-		v)
-			printf "%s\n" "$VERSION"
-			exit 0
-			;;
-		F)
-			PREF_FILTER_DEBUG_LOGGING=true && printf "%s\n" "> ${ORANGE}warning:${NC} filter logging is enabled. this setting is only for informational and debug purposes"
-			;;
-		V)
-			PREF_VERBOSE_LOGGING=true && printf "%s\n" "> ${ORANGE}warning:${NC} verbose logging is enabled. this setting is only for informational and debugging purposes"
-			;;
-		c)
-			#GET TARGET MAC ADDRESS
-			target_mac="$OPTARG"
+        r)  PREF_PERIODIC_MODE=true
+            printf "%s\n" "> ${ORANGE}warning:${NC} periodic scan mode may cause interference with 2.4GHz networks if run on a Raspberry Pi"
+            ;;
+        v)
+            printf "%s\n" "$VERSION"
+            exit 0
+            ;;
+        F)
+            PREF_FILTER_DEBUG_LOGGING=true && printf "%s\n" "> ${ORANGE}warning:${NC} filter logging is enabled. this setting is only for informational and debug purposes"
+            ;;
+        V)
+            PREF_VERBOSE_LOGGING=true && printf "%s\n" "> ${ORANGE}warning:${NC} verbose logging is enabled. this setting is only for informational and debugging purposes"
+            ;;
+        c)
+            #GET TARGET MAC ADDRESS
+            target_mac="$OPTARG"
 
-			#REMOVE PREVIOUS PAIRINGS
-			printf "%s\n" "> removing previous pairings to $target_mac"
-			(echo -e "remove $target_mac" | bluetoothctl &>/dev/null)
+            #REMOVE PREVIOUS PAIRINGS
+            printf "%s\n" "> removing previous pairings to $target_mac"
+            (echo -e "remove $target_mac" | bluetoothctl &>/dev/null)
 
-			#DEBUG ECHO
-			printf "%s\n" "> creating connection to $target_mac..."
-			printf "%s\n" "> within 5 seconds, please set $target_mac to discoverable..."
+            #DEBUG ECHO
+            printf "%s\n" "> creating connection to $target_mac..."
+            printf "%s\n" "> within 5 seconds, please set $target_mac to discoverable..."
 
-			#WAIT 5 SECONDS FOR DISCOVERABLE MODE
-			sleep 5
+            #WAIT 5 SECONDS FOR DISCOVERABLE MODE
+            sleep 5
 
-			#CREATE CONNECTION
-			return_data=$(hcitool cc $target_mac 2>&1 && hcitool auth $target_mac 2>&1 && hcitool dc $target_mac 2>&1)
+            #CREATE CONNECTION
+            return_data=$(hcitool cc $target_mac 2>&1 && hcitool auth $target_mac 2>&1 && hcitool dc $target_mac 2>&1)
 
-			#ERROR REPORTING
-			[[ $return_data =~ .*error.* ]] && printf "%s\n" "> ${RED}error: ${NC}connection to $target_mac failed" || printf "%s\n" "> connection created to $target_mac"
+            #ERROR REPORTING
+            [[ $return_data =~ .*error.* ]] && printf "%s\n" "> ${RED}error: ${NC}connection to $target_mac failed" || printf "%s\n" "> connection created to $target_mac"
 
-			exit 0
-			;;
-		C)
-			PREF_CLEAN_MQTT=true && printf "%s\n" "> cleaning retained messages on broker"
-			;;
-		E)  PREF_MQTT_REPORT_SCAN_MESSAGES=true && printf "%s\n" "> publishing MQTT .../scan/[arrival|depart]/[start|end]"
-			;;
-		s)  PREF_MQTT_SINGLE_TOPIC_MODE=true && printf "%s\n" "> publishing all MQTT presence messages to \$mqtt_topicpath/\$mqtt_publisher_identity"
-			;;
-		x)  PREF_SHOULD_RETAIN=true  && printf "%s\n" "> retaining mqtt status reports"
-			;;
-		R)  PREF_REDACT=true  && printf "%s\n" "> private information redacted from logs"
-			;;
-		d)  PREF_RESTORE_DEFAULTS=true 	&& printf "%s\n" "> restoring default settings"
-			;;
-		u)  PREF_UPDATE_SERVICE=true 	&& printf "%s\n" "> updating monitor.service"
-			;;
-		f)  PREF_FORMAT_MQTT=true 		&& $PREF_VERBOSE_LOGGING && printf "%s\n" "> only allow letters, numbers, and spaces in mqtt topic paths"
-			;;
-		b)  PREF_BEACON_MODE=true 		&& $PREF_VERBOSE_LOGGING && printf "%s\n" "> generic bluetooth beacon, ibeacon, and known beacon address reporting mode enabled"
-			;;
-		t)  #DO WE INCLUDE THE REPORTING TRIGGER?
-			[[ $OPTARG = *r* ]] && PREF_TRIGGER_MODE_REPORT_OUT=true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> trigger mode: report out MQTT arrive/depart scan triggers to other devices"
-			#SORT THROUGH REMAINING FILTERS
-			case "$OPTARG" in
-				r)	PREF_TRIGGER_MODE_REPORT_OUT=true
-					;;
-				d|rd|dr)	PREF_TRIGGER_MODE_DEPART=true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> trigger mode: depart scan only on MQTT trigger"
-					;;
-				a|ra|ar)	PREF_TRIGGER_MODE_ARRIVE=true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> trigger mode: arrive scan only on MQTT trigger"
-					;;
-				da|ad|rda|rad|dra|ard|dar|adr) PREF_TRIGGER_MODE_ARRIVE=true && PREF_TRIGGER_MODE_DEPART==true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> trigger mode: scan only (both on arrive and depart) on trigger"
-					;;
-				*) printf "%s\n" "> ${ORANGE}warning: ${NC}unknown trigger mode: $OPTARG"
-				;;
-			esac
-			;;
-		a)  PREF_REPORT_ALL_MODE=true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> report all scan results mode enabled"
-			;;
+            exit 0
+            ;;
+        C)
+            PREF_CLEAN_MQTT=true && printf "%s\n" "> cleaning retained messages on broker"
+            ;;
+        E)  PREF_MQTT_REPORT_SCAN_MESSAGES=true && printf "%s\n" "> publishing MQTT .../scan/[arrival|depart]/[start|end]"
+            ;;
+        s)  PREF_MQTT_SINGLE_TOPIC_MODE=true && printf "%s\n" "> publishing all MQTT presence messages to \$mqtt_topicpath/\$mqtt_publisher_identity"
+            ;;
+        x)  PREF_SHOULD_RETAIN=true  && printf "%s\n" "> retaining mqtt status reports"
+            ;;
+        R)  PREF_REDACT=true  && printf "%s\n" "> private information redacted from logs"
+            ;;
+        d)  PREF_RESTORE_DEFAULTS=true     && printf "%s\n" "> restoring default settings"
+            ;;
+        u)  PREF_UPDATE_SERVICE=true     && printf "%s\n" "> updating monitor.service"
+            ;;
+        f)  PREF_FORMAT_MQTT=true         && $PREF_VERBOSE_LOGGING && printf "%s\n" "> only allow letters, numbers, and spaces in mqtt topic paths"
+            ;;
+        b)  PREF_BEACON_MODE=true         && $PREF_VERBOSE_LOGGING && printf "%s\n" "> generic bluetooth beacon, ibeacon, and known beacon address reporting mode enabled"
+            ;;
+        t)  #DO WE INCLUDE THE REPORTING TRIGGER?
+            [[ $OPTARG = *r* ]] && PREF_TRIGGER_MODE_REPORT_OUT=true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> trigger mode: report out MQTT arrive/depart scan triggers to other devices"
+            #SORT THROUGH REMAINING FILTERS
+            case "$OPTARG" in
+                r)    PREF_TRIGGER_MODE_REPORT_OUT=true
+                    ;;
+                d|rd|dr)    PREF_TRIGGER_MODE_DEPART=true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> trigger mode: depart scan only on MQTT trigger"
+                    ;;
+                a|ra|ar)    PREF_TRIGGER_MODE_ARRIVE=true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> trigger mode: arrive scan only on MQTT trigger"
+                    ;;
+                da|ad|rda|rad|dra|ard|dar|adr) PREF_TRIGGER_MODE_ARRIVE=true && PREF_TRIGGER_MODE_DEPART==true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> trigger mode: scan only (both on arrive and depart) on trigger"
+                    ;;
+                *) printf "%s\n" "> ${ORANGE}warning: ${NC}unknown trigger mode: $OPTARG"
+                ;;
+            esac
+            ;;
+        a)  PREF_REPORT_ALL_MODE=true && $PREF_VERBOSE_LOGGING && printf "%s\n" "> report all scan results mode enabled"
+            ;;
         D)  PREF_CONFIG_DIR=$OPTARG && printf "%s\n" "> using custom config directory [$PREF_CONFIG_DIR]"
             [ ! -d "$PREF_CONFIG_DIR" ] && printf "%s\n" "> ${RED}error: ${NC}config directory [$PREF_CONFIG_DIR] doesn't exist" && exit 1
                 ;;
-		*)	printf "%s\n" "> unknown or depreciated argument: $opt"
-	esac
+        *)    printf "%s\n" "> unknown or depreciated argument: $opt"
+    esac
 done
 
 #RESET OPTION INDEX

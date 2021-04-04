@@ -16,8 +16,8 @@
 # PERIODIC TRIGGER TO MAIN LOOP
 # ----------------------------------------------------------------------------------------
 beacon_database_expiration_trigger () {
-	while : ; do
-		sleep "$(( PREF_BEACON_EXPIRATION / 12 ))"
-		echo "BEXP" > main_pipe
-	done
+    while : ; do
+        sleep "$(( PREF_BEACON_EXPIRATION / 12 ))"
+        echo "BEXP" > main_pipe
+    done
 }
