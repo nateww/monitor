@@ -25,7 +25,7 @@
 # ------------------------------------------------------------------------------
 
 #VERSION NUMBER
-export version=0.2.200
+export version=0.3.001
 
 # CAPTURE ARGS IN VAR TO USE IN SOURCED FILE
 export RUNTIME_ARGS=("$@")
