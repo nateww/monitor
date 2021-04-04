@@ -119,9 +119,9 @@ first_arrive_scan=true
 # ------------------------------------------------------------------------------
 
 # LOAD PUBLIC ADDRESSES TO SCAN INTO ARRAY, IGNORING COMMENTS
-mapfile -t known_static_beacons < < (grep -v '^#' $BEAC_CONFIG | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | aws '{print $1}' | sed 's/[ \t]+$//')
-mapfile -t known_static_addresses < <(grep -v '^#' $PUB_CONFIG | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | sed 's/[ \t]+$//')
-mapfile -t address_blacklist < <(grep -v '^#' $ADDRESS_BLACKLIST | awk '{print $1}' | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | sed 's/[ \t]+$//')
+mapfile -t known_static_beacons < <(grep -v '^#' $BEAC_CONFIG | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | awk '{print $1}' | sed 's/[ \t]+$//')
+mapfile -t known_static_addresses < <(grep -v '^#' $PUB_CONFIG | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | awk '{print $1}' | sed 's/[ \t]+$//')
+mapfile -t address_blacklist < <(grep -v '^#' $ADDRESS_BLACKLIST | grep -oiE "([0-9a-f]{2}:){5}[0-9a-f]{2}" | awk '{print $1}' | sed 's/[ \t]+$//')
 
 # ASSEMBLE COMMENT-CLEANED BLACKLIST INTO BLACKLIST ARRAY
 for addr in "${address_blacklist[@]^^}"; do
@@ -138,8 +138,6 @@ previously_connected_devices=$(echo "paired-devices" | bluetoothctl | grep -Eio 
 
 # POPULATE KNOWN DEVICE ADDRESS
 for addr in "${known_static_addresses[@]^^}"; do
-    #================= SHOULD WE USE AN ALIAS? =====================
-
     # WAS THERE A NAME HERE?
     known_name=$(grep -i "$addr" $PUB_CONFIG | sed "s/^.*$addr//i" | tr "\\t" " " | sed 's/  */ /gi;s/#.\{0,\}//gi' | sed "s/[ \t]+$//" )
 
@@ -152,7 +150,7 @@ for addr in "${known_static_addresses[@]^^}"; do
     # REMOVE FINAL UNDERSCORES SHOULD THERE BE ONE
     alias_value=$(echo "$alias_value" | sed 's/[^0-9a-z]\{1,\}$//gi;s/^[^0-9a-z]\{1,\}//gi;s/__*/_/gi')
 
-    # DEFAULT
+    #================= SHOULD WE USE AN ALIAS? =====================
     alias_value=${alias_value:-$addr}
 
     # ALIASES
@@ -184,8 +182,6 @@ done
 # ------------------------------------------------------------------------------
 # POPULATE KNOWN DEVICE ADDRESS
 for addr in "${known_static_beacons[@]^^}"; do
-    #================= SHOULD WE USE AN ALIAS? =====================
-
     # WAS THERE A NAME HERE?
     known_name=$(grep -i "$addr" $PUB_CONFIG | sed "s/^.*$addr//i" | tr "\\t" " " | sed 's/  */ /gi;s/#.\{0,\}//gi' | sed "s/[ \t]+$//" )
 
@@ -198,7 +194,7 @@ for addr in "${known_static_beacons[@]^^}"; do
     # REMOVE FINAL UNDERSCORES SHOULD THEY BE NECESSARY
     alias_value=$(echo "$alias_value" | sed 's/[^0-9a-z]\{1,\}$//gi;s/^[^0-9a-z]\{1,\}//gi;s/__*/_/gi')
 
-    # DEFAULT
+    #================= SHOULD WE USE AN ALIAS? =====================
     alias_value=${alias_value:-$addr}
 
     # ALIASES
@@ -219,6 +215,29 @@ for addr in "${known_static_beacons[@]^^}"; do
 done
 
 # ------------------------------------------------------------------------------
+# CREATE CONNECTION AND DETERMINE RSSI
+# AVERAGE OVER THREE CYCLES; IF BLANK GIVE VALUE OF 100
+# ------------------------------------------------------------------------------
+fetch_device_rssi() {
+    local avg_total=0
+    local counter=0
+    local known_addr=$1
+
+    $(hcitool cc "$known_addr")
+    for i in 1 2 3; do
+        scan_result=$(hcitool rssi "$known_addr" 2>&1)
+        scan_result=${scan_result//[^0-9]/}
+        scan_result=${scan_result:-99}
+        [[ "$scan_result" == "0" ]] && scan_result=99
+        avg_total=$((avg_total + scan_result))
+        counter=$((counter+1))
+        sleep 0.5;
+    done
+    avg=$((avg_total / counter))
+    return $avg
+}
+
+# ------------------------------------------------------------------------------
 # ASSEMBLE RSSI LISTS
 # ------------------------------------------------------------------------------
 connectable_present_devices() {
@@ -236,22 +255,7 @@ connectable_present_devices() {
 
         # TEST IF THIS DEVICE MATCHES THE TARGET SCAN STATE
         if [ "$this_state" == "1" ] && [[ "$previously_connected_devices" =~ .*$known_addr.* ]]; then
-            # CREATE CONNECTION AND DETERMINE RSSI
-            # AVERAGE OVER THREE CYCLES; IF BLANK GIVE VALUE OF 100
-            known_device_rssi=$(counter=0; \
-                avg_total=0; \
-                hcitool cc "$known_addr"; \
-                avg_total=""; \
-                for i in 1 2 3; do \
-                  scan_result=$(hcitool rssi "$known_addr" 2>&1); \
-                  scan_result=${scan_result//[^0-9]/}; \
-                  scan_result=${scan_result:-99}; \
-                  [[ "$scan_result" == "0" ]] && scan_result=99; \
-                  counter=$((counter+1)); \
-                  avg_total=$((avg_total + scan_result )); \
-                  sleep 0.5; \
-                done; \
-                printf "%s" "$(( avg_total / counter ))")
+            known_device_rssi=fetch_device_rssi $known_addr
 
             # PUBLISH MESSAGE TO RSSI SENSOR
             publish_rssi_message \
@@ -282,10 +286,10 @@ scannable_devices_with_state() {
     # SET VALUES AFTER DECLARATION
     timestamp=$(date +%s)
     scan_state="$1"
+
     # SCAN ALL? SET THE DEFAULT SCAN STATE TO [X]
     scan_state=${scan_state:-2}
 
-    # FIRST, TEST IF WE HAVE DONE THIS TYPE OF SCAN TOO RECENTLY
     if [ "$scan_state" == "0" ]; then
         # SCAN FOR ARRIVED DEVICES
         scan_type_diff=$((timestamp - last_arrival_scan))
@@ -312,12 +316,11 @@ scannable_devices_with_state() {
         last_scan="${known_static_device_scan_log[$known_addr]}"
         time_diff=$((timestamp - last_scan))
 
-        # SCAN IF DEVICE HAS NOT BEEN SCANNED
-        # WITHIN LAST [X] SECONDS
+        # SCAN IF DEVICE HAS NOT BEEN SCANNED WITHIN LAST [X] SECONDS
         if [ "$time_diff" -gt "$PREF_MINIMUM_TIME_BETWEEN_SCANS" ]; then
             # TEST IF THIS DEVICE MATCHES THE TARGET SCAN STATE
             if [ "$this_state" == "$scan_state" ]; then
-                # ASSEMBLE LIST OF DEVICES TO SCAN
+                # ADD TO LIST OF DEVICES TO SCAN
                 return_list="$return_list $this_state$known_addr"
             elif [ "$this_state" == "2" ] || [ "$this_state" == "3" ]; then
                 # SCAN FOR ALL DEVICES THAT HAVEN'T BEEN RECENTLY SCANNED;
@@ -417,7 +420,7 @@ perform_complete_scan() {
             expected_name=${expected_name:-Unknown}
 
             # DEBUG LOGGING
-            $PREF_VERBOSE_LOGGING && log "[CMD-SCAN]" "(No. $repetition) $known_addr $transition_type?"
+            $PREF_VERBOSE_LOGGING && log "[CMD-SCAN]" "(# $repetition) $known_addr $transition_type?"
 
             # PERFORM NAME SCAN FROM HCI TOOL. THE HCITOOL CMD 0X1 0X0019 IS POSSIBLE, BUT HCITOOL NAME
             # SCAN PERFORMS VERIFICATIONS THAT REDUCE FALSE NEGATIVES.
