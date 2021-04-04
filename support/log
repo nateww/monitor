@@ -22,44 +22,44 @@ last_log_line=""
 duplicate_log_count=1
 launch_flag=""
 
-#LOGGING FLAG TO DISTINGUISH SERVICE-LAUNCHED 
+#LOGGING FLAG TO DISTINGUISH SERVICE-LAUNCHED
 #LOGGS FROM CONSOLE LOGGED LAUNCHES
 $SERVICE_ACTIVE && launch_flag="[+]" || launch_flag="[-]"
 
-#FORK THE LOG FROM THE MAIN THREAD 
+#FORK THE LOG FROM THE MAIN THREAD
 log_listener () {
 
 	#LOG PIPE
-	while true; do 
-		#SHOULD EXIT? 
-		[ "$PREF_DISABLE_LOGGING" == true ] && return 0 
-		
-		#READ FROM THE MAIN PIPE
-		local line 
-		while read line; do 
+	while true; do
+		#SHOULD EXIT?
+		[ "$PREF_DISABLE_LOGGING" == true ] && return 0
 
-			#ECHO TO CONSOLE, REMOVING EXTRA SPACES	
+		#READ FROM THE MAIN PIPE
+		local line
+		while read line; do
+
+			#ECHO TO CONSOLE, REMOVING EXTRA SPACES
 			should_repeat=""
 			line_append=""
 
 			#IS THIS LINE DUPLICATED?
-			if [ "$last_log_line" == "$line" ] ; then 
+			if [ "$last_log_line" == "$line" ] ; then
 				duplicate_log_count=$((duplicate_log_count + 1 ))
-			else 
+			else
 				duplicate_log_count=1
-			fi  
+			fi
 
-			if [ "$PREF_REDACT" == true ]; then 
+			if [ "$PREF_REDACT" == true ]; then
 				line=$(echo "$line" | sed "s/\([0-9A-Fa-f]\{2\}:\)\{5\}/ [REDACTED]:/gi;s/\([0-9A-Fa-f-]\{36\}\)/ [REDACTED]/gi" )
 				line="$line"
-			fi 
+			fi
 
 			#ECHO LAST LINE
 			printf "%s\n" "$launch_flag $version $(date "+%d-%m-%Y %I:%M:%S %p") $line"
 			last_log_line="$line"
 
 		done < log_pipe
-	done 
+	done
 }
 
 
