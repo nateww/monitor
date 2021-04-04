@@ -50,5 +50,7 @@ log_listener () {
 # PRINT TO LOG
 log() {
     # SEND TO LOG PIPE
-    [ "$PREF_DISABLE_LOGGING" == false ] && echo "$1" | sed 's/  */ /g' > log_pipe
+    col1=$1
+    col2=$2
+    [ "$PREF_DISABLE_LOGGING" == false ] && echo "$1    $2" | sed 's/  */ /g' > log_pipe
 }
