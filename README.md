@@ -4,7 +4,7 @@
 
 ![version](https://img.shields.io/badge/version-0.3-green.svg?maxAge=2592000) ![mosquitto](https://img.shields.io/badge/mosquitto-1.5+-blue.svg?maxAge=2592000)
 
-[**Frequently Asked Questions**](https://github.com/nateww/monitor/blob/master/support/README.md)
+[**Frequently Asked Questions**](https://github.com/nateww/monitor/blob/master/support/FAQ.md)
 
 <details><summary><b>Installation Instructions</b></summary>
 
