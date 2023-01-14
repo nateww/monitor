@@ -222,6 +222,7 @@ fetch_device_rssi() {
     local avg_total=0
     local counter=0
     local known_addr=$1
+    local scan_result
 
     $(hcitool cc "$known_addr")
     for i in 1 2 3; do
@@ -243,8 +244,6 @@ fetch_device_rssi() {
 connectable_present_devices() {
     local this_state
     local known_device_rssi
-    local avg_total
-    local scan_result
 
     # ITERATE THROUGH THE KNOWN DEVICES
     local known_addr
@@ -450,6 +449,12 @@ perform_complete_scan() {
                   "manufacturer=$manufacturer" \
                   "type=KNOWN_MAC"
 
+                # Publish the RSSI for the new device
+                known_device_rssi=$(fetch_device_rssi $known_addr)
+                publish_rssi_message \
+                  "$known_addr" \
+                  "-$known_device_rssi"
+
                 # REMOVE FROM SCAN
                 devices_next=$(echo "$devices_next" | sed "s/$known_addr_stated//gi;s/[ ]+/ /g")
 
@@ -467,6 +472,12 @@ perform_complete_scan() {
                   "manufacturer=$manufacturer" \
                   "type=KNOWN_MAC"
 
+                # Publish the RSSI for the new device
+                known_device_rssi=$(fetch_device_rssi $known_addr)
+                publish_rssi_message \
+                  "$known_addr" \
+                  "-$known_device_rssi"
+
                 # COOPERATIVE SCAN ON RESTART
                 $PREF_TRIGGER_MODE_REPORT_OUT && publish_cooperative_scan_message "arrive"
 
@@ -476,13 +487,19 @@ perform_complete_scan() {
 
                 # NEED TO REPORT?
                 if [[ $should_report =~ .*$known_addr.* ]] || [ "$PREF_REPORT_ALL_MODE" == true ]; then
-                    #REPORT PRESENCE
+                    # REPORT PRESENCE
                     publish_presence_message \
                       "id=$known_addr" \
                       "confidence=100" \
                       "name=$expected_name" \
                       "manufacturer=$manufacturer" \
                       "type=KNOWN_MAC"
+
+                    # Publish the updated RSSI for the device
+                    known_device_rssi=$(fetch_device_rssi $known_addr)
+                    publish_rssi_message \
+                      "$known_addr" \
+                      "-$known_device_rssi"
                 fi
             fi
 
@@ -511,6 +528,9 @@ perform_complete_scan() {
                   "name=$expected_name" \
                   "manufacturer=$manufacturer" \
                   "type=KNOWN_MAC"
+
+                # Ignore RSSI (for now) until it reconnects or totally
+                # falls off.
 
                 # IF WE DO FIND A NAME LATER, WE SHOULD REPORT OUT
                 should_report="$should_report$known_addr"
@@ -1028,6 +1048,12 @@ while true; do
                       "confidence=$device_state" \
                       "name=${known_public_device_name[$addr]}" \
                       "type=KNOWN_MAC"
+
+                    # Publish the RSSI for the device
+                    known_device_rssi=$(fetch_device_rssi $known_addr)
+                    publish_rssi_message \
+                      "$known_addr" \
+                      "-$known_device_rssi"
                 done
 
             elif [[ $mqtt_topic_branch =~ .*ADD\ STATIC\ DEVICE.* ]] || [[ $mqtt_topic_branch =~ .*DELETE\ STATIC\ DEVICE.* ]]; then
