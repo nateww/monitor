@@ -205,7 +205,7 @@ FILTERED_ARGS=$(echo "$(IFS=' '; echo "${RUNTIME_ARGS[*]}")" | sed 's/ \?-d//gi;
 if [ "$should_install" == "y" ] || [ "$PREF_UPDATE_SERVICE" == true ] ; then
     # REMOVE ALL INSTANCES
     if [ -f "$service_path" ]; then
-        rm "$service_path" 2>&1 >/dev/null
+        rm -f "$service_path"
     fi
 
     # CHECK FOR SYSTEMCTL FILE
@@ -248,7 +248,7 @@ fi
 
 # MQTT PREFERENCES
 PREF_CONFIG="$base_directory/behavior_preferences"
-[ "$PREF_RESTORE_DEFAULTS" == true ] && rm "$PREF_CONFIG"
+[ "$PREF_RESTORE_DEFAULTS" == true ] && rm -f "$PREF_CONFIG"
 
 # RESTORE DEFAULTS?
 should_restore_defaults=false

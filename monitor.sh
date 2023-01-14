@@ -752,7 +752,7 @@ determine_name() {
 # ------------------------------------------------------------------------------
 
 # SET LOG
-rm .pids 2>&1 1>/dev/null
+rm -f .pids
 
 log_listener &
 listener_pid="$!"
