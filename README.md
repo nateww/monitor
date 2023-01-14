@@ -200,7 +200,6 @@ message: {
     "confidence":"{{ranging from 0-100}}",
     "name":"{{if available}}",
     "power":"{{if available}}",
-    "rssi":"{{if available}}",
     "mac":"{{if ibeacon, the current mac address associated with the uuid}}",
     "manufacturer":{{if available}}",
     "type":"{{GENERIC_BEACON_PUBLIC or APPLE_IBEACON}},
@@ -466,7 +465,7 @@ sudo bash monitor.sh
 Observe the output of the script for debug log [CMD-RAND] lines including [failed filter] or [passed filter]. These lines show the anonymous advertisements `monitor` sees and how `monitor` filters those advertisements. In particular, cycle the Bluetooth power on your phone or another device and look at the `flags` value, the `pdu` value, and the `man` (manufacturer) value that appears after you turn Bluetooth power back on. Remember, the address you see in the log will be an anonymous address - ignore it, we're only focused on the values referenced above. 
 
 ```
-0.3.xxx 03:25:39 pm [CMD-RAND]  [passed filter] data: 00:11:22:33:44:55 pdu: ADV_NONCONN_IND rssi: -73 dBm flags: 0x1b man: Apple, Inc. delay: 4
+0.3.xxx 03:25:39 pm [CMD-RAND]  [passed filter] data: 00:11:22:33:44:55 pdu: ADV_NONCONN_IND flags: 0x1b man: Apple, Inc. delay: 4
 ```
 
 #### Pass filters
@@ -526,8 +525,6 @@ In addition to the options described above, there are a number of advanced optio
 |-|-|-|
 PREF_INTERSCAN_DELAY|3|This is a fixed delay between `name` requests. Increasing the value will decrease interference, but will decrease responsiveness. Decreasing the value will risk a Bluetooth hardware fault.|
 PREF_RANDOM_DEVICE_EXPIRATION_INTERVAL|75|This is the interval after which an anonymous advertisement mac address is considered expired. Increasing this value will reduce arrival scan frequency, but will also increase memory footprint (minimal) and will decrease the frequency of depart scans.|
-PREF_RSSI_CHANGE_THRESHOLD|-20|If a beacon's rssi changes by at least this value, then the beacon will be reported again via mqtt.|
-PREF_RSSI_IGNORE_BELOW|-75|If an anonymous advertisement is "farther" away (lower RSSI), ignore the advertisement
 PREF_HCI_DEVICE|hci0|Select which hci device should be used by `monitor`|
 PREF_COOPERATIVE_SCAN_THRESHOLD|60|Once confidence of a known device falls below this value, send an mqtt message to other `monitor` nodes to begin an arrival scan or a departure scan.|
 PREF_MQTT_REPORT_SCAN_MESSAGES|false|This value is either true or false and determines whether `monitor` publishes when a scan begins and when a scan ends|
@@ -541,31 +538,6 @@ PREF_ADVERTISEMENT_OBSERVED_INTERVAL_STEP|15|This is the minimum interval (in se
 PREF_DEPART_SCAN_INTERVAL|30|If using periodic scanning mode, this is the minimum interval (in seconds) at which depart scans are triggered automatically. 
 PREF_ARRIVE_SCAN_INTERVAL|15|If using periodic scanning mode, this is the minimum interval (in seconds) at which arrive scans are triggered automatically. 
 
-
-## RSSI Tracking
-
-This script can also track RSSI changes throughout the day. This can be used for very rudimentary room- or floor-level tracking. Only devices in `known_static_addresses` that have been paired to a `monitor` node will have their RSSI tracked. Here's how to pair: 
-
-1. Stop `monitor` service:
-
-```bash
-sudo systemctl stop monitor
-```
-
-2. Run `monitor` with `-c` flag, followed by the mac address of the known_device to connect:
-
-```bash
-sudo bash monitor.sh -c 00:11:22:33:44:55
-```
-
-After this, follow the prompts given by `monitor` and your device will be connected. That's it. After you restart monitor will periodically (once every ~1.5 minutes) connect to your phone and take three RSSI samples, average the samples, and report a string message to the same path as a confidence report, with the additional path component of */rssi*. So, if a `monitor` node is named 'first floor', an rssi message is reported to:
-
-```bash 
-topic: monitor/first floor/00:11:22:33:44:55/rssi
-message: -99 through 0
-```
-
-If an rssi measurement cannot be obtained, the value of -99 is sent. 
 
 ## Report known states
 

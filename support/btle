@@ -92,15 +92,10 @@ btle_packet_processor () {
         POWER=$(echo "ibase=16; $POWER" | bc)
         POWER=$((POWER - 256))
 
-        #RSSI CALCULATION
-        local RSSI=$(echo $packet | sed 's/^.\{132\}\(.\{2\}\).*$/\1/')
-        RSSI=$(echo "ibase=16; $RSSI" | bc)
-        RSSI=$((RSSI - 256))
-
         timestamp=$(date +%s)
 
         #SEND TO MAIN LOOP
-        [ -n "$UUID" ] && printf "BEAC$UUID|$MAJOR|$MINOR|$RSSI|$POWER|$received_mac_address|$timestamp\n" > main_pipe
+        [ -n "$UUID" ] && printf "BEAC$UUID|$MAJOR|$MINOR|$POWER|$received_mac_address|$timestamp\n" > main_pipe
     fi
 }
 
@@ -119,7 +114,6 @@ btle_text_processor () {
     local received_mac_address
     local packet
     local pdu_type
-    local rssi_value
     local gap_name_str
     local should_ignore
     local manufacturer
@@ -176,13 +170,6 @@ btle_text_processor () {
             tx_type=${BASH_REMATCH^^}
             tx_type=${tx_type//\|/}
             tx_type=${tx_type:0:4}
-        fi
-
-        #------------ RSSI
-        if [[ $packet =~ RSSI[^:]*?:([^~\(]*) ]]; then
-            rssi_value=${BASH_REMATCH[1]}
-            rssi_value=${rssi_value//\|/}
-            rssi_value=${rssi_value//[^-0-9]/}
         fi
 
         #------------ NAME
@@ -278,7 +265,6 @@ btle_text_processor () {
             printf "%s\n" "pdu:         ${pdu_type:-???}"
             printf "%s\n" "type:         ${device_type:-???}"
             printf "%s\n" "oem:         ${oem_data:-???}"
-            printf "%s\n" "rssi:         ${rssi_value:-???} dBm"
             printf "%s\n" "flags:        ${flags:-???}"
             printf "%s\n" "hex:        ${hex_data:-???}"
             printf "%s\n" "resolvable:    ${resolvable:-???}"
@@ -292,7 +278,7 @@ btle_text_processor () {
 
         if [ "$tx_type" == "PUBL" ]; then
             #PRINT ALL PUBLIC BEACONS
-            printf "%s\n" "$tx_type$received_mac_address|$pdu_type|$gap_name_str|$rssi_value|$adv_data|$manufacturer|$device_type|$flags|$oem_data|$timestamp|$resolvable|$hex_data" > main_pipe
+            printf "%s\n" "$tx_type$received_mac_address|$pdu_type|$gap_name_str|$adv_data|$manufacturer|$device_type|$flags|$oem_data|$timestamp|$resolvable|$hex_data" > main_pipe
 
         elif [ "$tx_type" == "RAND" ]; then
 
@@ -307,14 +293,14 @@ btle_text_processor () {
 
                 #IF THIS DOES NOT HAVE A UUID, PROCESS AS GENERIC BEACON
                 should_ignore=false
-                [ "$tx_type" == "RAND" ] && [ -n "$rssi_value" ] && [[ "$PREF_RSSI_IGNORE_BELOW" -gt "$rssi_value" ]] && should_ignore=true
+                [ "$tx_type" == "RAND" ] && should_ignore=true
 
                 #IF WE HAVE A NAME, DEFINITELY REPORT
                 [ -n "$gap_name_str" ] && should_ignore=false
 
                 if [ "$should_ignore" == false ]; then
                     #REPORT TO MAIN LOOP
-                    printf "%s\n" "$tx_type$received_mac_address|$pdu_type|$gap_name_str|$rssi_value|$adv_data|$manufacturer|$device_type|$flags|$oem_data|$timestamp|$resolvable|$hex_data" > main_pipe
+                    printf "%s\n" "$tx_type$received_mac_address|$pdu_type|$gap_name_str|$adv_data|$manufacturer|$device_type|$flags|$oem_data|$timestamp|$resolvable|$hex_data" > main_pipe
                 fi
             fi
         fi

@@ -201,42 +201,6 @@ mqtt_error_handler () {
 }
 
 # ----------------------------------------------------------------------------------------
-# PUBLISH RSSI MESSAGE
-# ----------------------------------------------------------------------------------------
-
-publish_rssi_message () {
-    if [ -n "$1" ]; then
-        #TIMESTAMP
-        local stamp
-        local address
-        local message
-        local mqtt_topic_branch
-
-        #SET ISOLATED ADDRESS
-        address="$1"
-        message="$2"
-        mqtt_topic_branch="$address"
-
-        #ALIASES?
-           $PREF_ALIAS_MODE && [ "${mqtt_aliases[$address]+abc}" ] && mqtt_topic_branch=${mqtt_aliases[$address]:-$address}
-
-        local topic="$mqtt_topicpath/$mqtt_publisher_identity/$mqtt_topic_branch/rssi"
-
-        $PREF_VERBOSE_LOGGING && log "[CMD-MQTT]    $topic"
-
-        #POST TO MQTT
-        while mqtt_error_handler $($mosquitto_pub_path \
-        -I "$mqtt_publisher_identity" \
-        $mqtt_version_append \
-        $mqtt_ca_file_append \
-        -L "$mqtt_url$topic" \
-        -m "$message" 2>&1); do
-            sleep 15
-        done
-    fi
-}
-
-# ----------------------------------------------------------------------------------------
 # PUBLISH MESSAGE
 # ----------------------------------------------------------------------------------------
 

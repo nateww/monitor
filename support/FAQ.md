@@ -69,17 +69,6 @@ sudo systemctl restart monitor
 Or, post a message with blank content to `monitor/scan/restart`
 </details>
 
-<details><summary><b> Why don't I see RSSI for my device?</b></summary><p><p>
-
-For phones, you'll have to connect to `monitor` first using the `-c` flag.
-</details>
-
-<details><summary><b> How do I force an RSSI update for a known device, like my phone?</b></summary><p><p>
-
-Post a message with blank content to `monitor/scan/rssi`
-
-</details>
-
 ____
 
 ## *Performance*
