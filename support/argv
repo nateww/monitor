@@ -13,26 +13,10 @@
 # ----------------------------------------------------------------------------------------
 
 #----------------------------------------------------------------------------------------
-# REPORT CURRENT VERSION
+# REPORT VERSION
 # ----------------------------------------------------------------------------------------
 
-previous_version=$(cat ".previous_version")
-
-#DETERMINE IF UPDATED SINCE LAST RUN
-if [ "$previous_version" != "$version" ]; then
-
-    #HAVE WE REPORTED AN UPDATE BEFORE?
-    [ -z "$previous_version" ] && previous_version="Unknown"
-
-    #UPDATE REPORT
-    printf "%s\n" "> updated $(basename "$0") (v. $previous_version) -> (v. $version)..."
-
-    #RECORD UPDATED VERSION
-    printf "%s\n" "$version" > ".previous_version"
-else
-    #STANDARD RUN
-    printf "%s\n" "> starting $(basename "$0") (v. $version)..."
-fi
+printf "%s\n" "> starting $(basename "$0") (v. $version)..."
 
 # ----------------------------------------------------------------------------------------
 # HELP TEXT
