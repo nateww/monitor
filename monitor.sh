@@ -234,7 +234,7 @@ fetch_device_rssi() {
         sleep 0.5;
     done
     avg=$((avg_total / counter))
-    return $avg
+    echo $avg
 }
 
 # ------------------------------------------------------------------------------
@@ -255,7 +255,7 @@ connectable_present_devices() {
 
         # TEST IF THIS DEVICE MATCHES THE TARGET SCAN STATE
         if [ "$this_state" == "1" ] && [[ "$previously_connected_devices" =~ .*$known_addr.* ]]; then
-            known_device_rssi=fetch_device_rssi $known_addr
+            known_device_rssi=$(fetch_device_rssi $known_addr)
 
             # PUBLISH MESSAGE TO RSSI SENSOR
             publish_rssi_message \
