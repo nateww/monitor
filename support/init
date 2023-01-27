@@ -96,11 +96,7 @@ if [ -f $MQTT_CONFIG ] ; then
     fi
 
     #DEFINE PASSWORD APPEND
-    if [ -z "$mqtt_user" ] && [ -z "$mqtt_password" ]; then
-        #WARNING
-        echo "> warning: operating in anonymous and unprotected mode for mqtt broker at $mqtt_address"
-
-    else
+    if [ -n "$mqtt_user" ] && [ -n "$mqtt_password" ]; then
         #PREPEND COLON FOR FULL URL PROCESSING
         mqtt_password=":$mqtt_password@"
     fi
